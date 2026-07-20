@@ -34,7 +34,9 @@ async function loadProducts() {
 }
 
 function editor(p, i) {
-  return `<article class="admin-card" data-sku="${p.sku}"><header><div><small>${p.sku}</small><h2>${p.nombre}</h2><span>${p.color_caja || ''}</span></div><span class="availability ${i.stock > 0 ? '' : 'out'}">Stock ${i.stock}</span></header>
+  const firstImage = (p.imagenes || [])[0] || '';
+  const thumbnail = firstImage || '../assets/logo.png';
+  return `<article class="admin-card" data-sku="${p.sku}" data-first-image="${attr(firstImage)}"><header><div class="admin-product-heading"><img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}"><div><small>${p.sku}</small><h2>${p.nombre}</h2><span>${p.color_caja || ''}</span></div></div><span class="availability ${i.stock > 0 ? '' : 'out'}">Stock ${i.stock}</span></header>
   <details><summary>Editar producto</summary><form>
     <label>Nombre<input name="nombre" value="${attr(p.nombre)}" required></label>
     <label>Descripción<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
@@ -59,7 +61,7 @@ function bindCard(card) {
   ['precio_base','multiplicador_mayorista','multiplicador_minorista'].forEach(n => form[n].addEventListener('input', calculate));
   form.addEventListener('submit', e => save(e, card.dataset.sku));
   form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
-  form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku)));
+  form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
   form.querySelectorAll('[data-remove-photo]').forEach(b => b.addEventListener('click', () => removePhoto(card.dataset.sku, b.dataset.removePhoto)));
 }
 
@@ -105,7 +107,27 @@ async function removePhoto(sku, url) {
 }
 
 function descriptionText(form, sku) { return `${form.nombre.value}\n\n${form.descripcion.value}\n\n${form.detalle_distintivo.value}\n\nSKU: ${sku}\nConsulta por WhatsApp: https://wa.me/${WHATSAPP}`; }
-async function share(value) { if (navigator.share) await navigator.share({ title:'Importadora A&N', text:value }); else await navigator.clipboard.writeText(value); }
+async function share(value, imageUrl, productName) {
+  if (navigator.share && imageUrl) {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const extension = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+      const safeName = productName.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      const file = new File([blob], `${safeName}.${extension}`, { type: blob.type || 'image/jpeg' });
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({ title: productName, text: value, files: [file] });
+        return;
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+    }
+  }
+  if (navigator.share) {
+    try { await navigator.share({ title: productName, text: value }); return; }
+    catch (error) { if (error?.name === 'AbortError') return; }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(value)}`, '_blank', 'noopener');
+}
 function attr(v) { return String(v ?? '').replace(/[&"]/g, c => c === '&' ? '&amp;' : '&quot;'); }
 function text(v) { return String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-

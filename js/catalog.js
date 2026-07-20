@@ -55,11 +55,32 @@ function openProduct(code) {
     <div class="dialog-details"><p class="eyebrow">${escapeHtml(product.categoria)}</p><h2>${escapeHtml(product.nombre)}</h2><p>${escapeHtml(product.descripcion)}</p>
     <h3>Presentaciones</h3><div class="variants">${product.variants.map(v => `<div><div><strong>${escapeHtml(v.color_caja || 'Presentación')}</strong>${v.color_interior ? `<span>Interior ${escapeHtml(v.color_interior)}</span>` : ''}</div><p>${escapeHtml(v.detalle_distintivo)}</p><footer><span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span><strong>${money(v.precio_minorista)}</strong></footer></div>`).join('')}</div>
     <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" href="https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hola, quisiera consultar por ${product.nombre} (${product.codigo_modelo}).`)}">Consultar por WhatsApp</a><button id="share-product" class="button secondary">Compartir</button></div></div>`;
-  content.querySelector('#share-product').addEventListener('click', async () => {
-    const data = { title: product.nombre, text: `${product.nombre}\n${product.descripcion}`, url: location.href };
-    if (navigator.share) await navigator.share(data); else await navigator.clipboard.writeText(`${data.text}\n${data.url}`);
-  });
+  content.querySelector('#share-product').addEventListener('click', () => shareProduct(product, images[0]));
   dialog.showModal();
+}
+
+async function shareProduct(product, imageUrl) {
+  const text = `${product.nombre}\n${product.descripcion}\n${location.href}`;
+  if (navigator.share && imageUrl) {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const extension = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+      const safeName = product.nombre.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      const file = new File([blob], `${safeName}.${extension}`, { type: blob.type || 'image/jpeg' });
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({ title: product.nombre, text, files: [file] });
+        return;
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+    }
+  }
+  if (navigator.share) {
+    try { await navigator.share({ title: product.nombre, text }); return; }
+    catch (error) { if (error?.name === 'AbortError') return; }
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
 }
 
 dialog.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
@@ -75,4 +96,3 @@ async function load() {
   groups = groupProducts(data); status.hidden = true; render();
 }
 load();
-

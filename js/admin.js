@@ -18,6 +18,15 @@ document.querySelector('#login-form').addEventListener('submit', async event => 
 document.querySelector('#logout').addEventListener('click', () => db.auth.signOut());
 db.auth.onAuthStateChange((_event, session) => showSession(session));
 
+document.querySelectorAll('[data-admin-panel]').forEach(button => button.addEventListener('click', () => {
+  const target = button.dataset.adminPanel;
+  document.querySelectorAll('[data-admin-panel]').forEach(item => item.classList.toggle('active', item === button));
+  document.querySelector('#products-panel').hidden = target !== 'products-panel';
+  document.querySelector('#whatsapp-panel').hidden = target !== 'whatsapp-panel';
+  document.querySelector('#admin-title').textContent = target === 'products-panel' ? 'Productos' : 'WhatsApp';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}));
+
 async function showSession(session) {
   loginView.hidden = !!session; adminView.hidden = !session;
   if (session) await loadProducts();

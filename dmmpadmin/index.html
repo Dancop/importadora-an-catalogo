@@ -27,10 +27,14 @@
 
     <section id="admin-view" hidden>
       <header class="admin-header">
-        <div><p class="eyebrow">Importadora A&amp;N</p><h1>Productos</h1></div>
+        <div><p class="eyebrow">Importadora A&amp;N</p><h1 id="admin-title">Productos</h1></div>
         <button id="logout" class="button secondary">Salir</button>
       </header>
-      <section class="message-settings">
+      <nav class="admin-menu" aria-label="Menú de administración">
+        <button class="admin-menu-item active" data-admin-panel="products-panel"><span>▦</span><strong>Productos</strong><small>Inventario y fotografías</small></button>
+        <button class="admin-menu-item" data-admin-panel="whatsapp-panel"><span>◉</span><strong>Mensaje WhatsApp</strong><small>Formato para compartir</small></button>
+      </nav>
+      <section id="whatsapp-panel" class="message-settings" hidden>
         <div class="settings-heading">
           <div><p class="eyebrow">WhatsApp</p><h2>Mensaje para compartir</h2><p>Edita el texto que acompañará la fotografía. Los campos entre llaves se completan automáticamente para cada producto.</p></div>
         </div>
@@ -50,15 +54,17 @@
 
 {enlace}</textarea>
             </label>
-            <div class="template-help"><strong>Campos automáticos</strong><p>Tócalos para insertarlos. Puedes cambiar las demás palabras libremente.</p><div id="template-variables"><button type="button" data-variable="{nombre}">Nombre</button><button type="button" data-variable="{descripcion}">Descripción</button><button type="button" data-variable="{detalle}">Detalle</button><button type="button" data-variable="{precio}">Precio</button><button type="button" data-variable="{disponibilidad}">Disponibilidad</button><button type="button" data-variable="{codigo}">Código</button><button type="button" data-variable="{enlace}">Enlace</button></div></div>
+            <div class="template-help"><strong>Campos automáticos</strong><p>Tócalos para insertarlos. No cambies el texto dentro de las llaves. <code>{enlace}</code> coloca automáticamente la dirección pública del catálogo.</p><div id="template-variables"><button type="button" data-variable="{nombre}">Nombre</button><button type="button" data-variable="{descripcion}">Descripción</button><button type="button" data-variable="{detalle}">Detalle</button><button type="button" data-variable="{precio}">Precio</button><button type="button" data-variable="{disponibilidad}">Disponibilidad</button><button type="button" data-variable="{codigo}">Código</button><button type="button" data-variable="{enlace}">Enlace del catálogo</button></div></div>
             <p id="template-message" class="form-message"></p>
             <div class="admin-actions"><button class="button primary" type="submit">Guardar mensaje</button><button id="reset-template" class="button secondary" type="button">Restaurar texto original</button></div>
           </form>
           <div class="template-preview"><div class="preview-title"><strong>Así se verá</strong><span>Vista previa</span></div><pre id="template-preview"></pre></div>
         </div>
       </section>
-      <div id="admin-status" class="status">Cargando inventario…</div>
-      <div id="admin-products" class="admin-products"></div>
+      <section id="products-panel">
+        <div id="admin-status" class="status">Cargando inventario…</div>
+        <div id="admin-products" class="admin-products"></div>
+      </section>
     </section>
   </main>
   <script type="module" src="../js/admin.js"></script>

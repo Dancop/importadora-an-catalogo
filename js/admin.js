@@ -31,7 +31,7 @@ async function loadProducts() {
     db.from('configuracion_publica').select('plantilla_whatsapp').eq('id', 'catalogo').single()
   ]);
   if (publicError || privateError) { status.textContent = 'Esta cuenta no tiene autorización o no se pudo cargar el inventario.'; return; }
-  shareTemplate = config?.plantilla_whatsapp || DEFAULT_TEMPLATE;
+  shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;
   document.querySelector('#share-template').value = shareTemplate;
   updateTemplatePreview();
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
@@ -139,6 +139,14 @@ function updateTemplatePreview() {
 }
 
 document.querySelector('#share-template').addEventListener('input', updateTemplatePreview);
+document.querySelectorAll('[data-variable]').forEach(button => button.addEventListener('click', () => {
+  const textarea = document.querySelector('#share-template');
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  textarea.setRangeText(button.dataset.variable, start, end, 'end');
+  textarea.focus();
+  updateTemplatePreview();
+}));
 document.querySelector('#reset-template').addEventListener('click', () => {
   document.querySelector('#share-template').value = DEFAULT_TEMPLATE;
   updateTemplatePreview();
@@ -147,11 +155,13 @@ document.querySelector('#template-form').addEventListener('submit', async event 
   event.preventDefault();
   const message = document.querySelector('#template-message');
   const template = document.querySelector('#share-template').value.trim();
+  if (!template) { document.querySelector('#share-template').value = DEFAULT_TEMPLATE; updateTemplatePreview(); message.textContent = 'Se restauró el texto original porque el mensaje no puede quedar vacío.'; return; }
   message.textContent = 'Guardando…';
   const { error } = await db.from('configuracion_publica').update({ plantilla_whatsapp: template, actualizado_en: new Date().toISOString() }).eq('id', 'catalogo');
   if (error) message.textContent = `No se guardó: ${error.message}`;
   else { shareTemplate = template; message.textContent = 'Plantilla guardada.'; }
 });
+updateTemplatePreview();
 async function share(value, imageUrl, productName) {
   if (navigator.share && imageUrl) {
     try {

@@ -7,6 +7,8 @@ const status = document.querySelector('#status');
 const dialog = document.querySelector('#product-dialog');
 const content = document.querySelector('#dialog-content');
 let groups = [];
+const DEFAULT_TEMPLATE = `*{nombre}*\n\n{descripcion}\n\n*Incluye y presentación:*\n{detalle}\n\n*Precio:* {precio}\n*Disponibilidad:* {disponibilidad}\n*Código:* {codigo}\n\n{enlace}`;
+let shareTemplate = DEFAULT_TEMPLATE;
 
 document.querySelectorAll('[data-whatsapp-general]').forEach(a => {
   a.href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent('Hola, quisiera consultar por los productos de Importadora A&N.')}`;
@@ -60,7 +62,17 @@ function openProduct(code) {
 }
 
 async function shareProduct(product, imageUrl) {
-  const text = `${product.nombre}\n${product.descripcion}\n${location.href}`;
+  const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
+  const priceText = prices.length
+    ? (Math.min(...prices) === Math.max(...prices) ? money(prices[0]) : `Desde ${money(Math.min(...prices))}`)
+    : 'Consultar precio';
+  const available = product.variants.some(v => v.disponible) ? 'Disponible' : 'Agotado';
+  const presentations = product.variants.map(v => `• Caja ${v.color_caja}${v.color_interior ? `, interior ${v.color_interior}` : ''}`).join('\n');
+  const text = applyTemplate(shareTemplate, {
+    nombre: product.nombre, descripcion: product.descripcion,
+    detalle: `Presentaciones:\n${presentations}`, precio: priceText,
+    disponibilidad: available, codigo: product.codigo_modelo, enlace: location.href
+  });
   if (navigator.share && imageUrl) {
     try {
       const response = await fetch(imageUrl);
@@ -83,6 +95,10 @@ async function shareProduct(product, imageUrl) {
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
 }
 
+function applyTemplate(template, values) {
+  return template.replace(/\{(nombre|descripcion|detalle|precio|disponibilidad|codigo|enlace)\}/g, (_match, key) => values[key] ?? '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 dialog.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
 document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
@@ -91,8 +107,12 @@ document.querySelectorAll('.filter').forEach(button => button.addEventListener('
 }));
 
 async function load() {
-  const { data, error } = await db.from('productos_publicos').select('*').order('orden');
+  const [{ data, error }, { data: config }] = await Promise.all([
+    db.from('productos_publicos').select('*').order('orden'),
+    db.from('configuracion_publica').select('plantilla_whatsapp').eq('id', 'catalogo').single()
+  ]);
   if (error) { status.textContent = 'No pudimos cargar el catálogo. Intenta nuevamente.'; return; }
+  shareTemplate = config?.plantilla_whatsapp || DEFAULT_TEMPLATE;
   groups = groupProducts(data); status.hidden = true; render();
 }
 load();

@@ -6,6 +6,8 @@ const loginView = document.querySelector('#login-view');
 const adminView = document.querySelector('#admin-view');
 const list = document.querySelector('#admin-products');
 const status = document.querySelector('#admin-status');
+const DEFAULT_TEMPLATE = `*{nombre}*\n\n{descripcion}\n\n*Incluye y presentación:*\n{detalle}\n\n*Precio:* {precio}\n*Disponibilidad:* {disponibilidad}\n*Código:* {codigo}\n\n{enlace}`;
+let shareTemplate = DEFAULT_TEMPLATE;
 
 document.querySelector('#login-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -23,11 +25,15 @@ async function showSession(session) {
 
 async function loadProducts() {
   status.hidden = false; status.textContent = 'Cargando inventario…';
-  const [{ data: products, error: publicError }, { data: inventory, error: privateError }] = await Promise.all([
+  const [{ data: products, error: publicError }, { data: inventory, error: privateError }, { data: config }] = await Promise.all([
     db.from('productos_publicos').select('*').order('orden'),
-    db.from('inventario_privado').select('*')
+    db.from('inventario_privado').select('*'),
+    db.from('configuracion_publica').select('plantilla_whatsapp').eq('id', 'catalogo').single()
   ]);
   if (publicError || privateError) { status.textContent = 'Esta cuenta no tiene autorización o no se pudo cargar el inventario.'; return; }
+  shareTemplate = config?.plantilla_whatsapp || DEFAULT_TEMPLATE;
+  document.querySelector('#share-template').value = shareTemplate;
+  updateTemplatePreview();
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
   list.innerHTML = products.map(p => editor(p, privateMap.get(p.sku))).join(''); status.hidden = true;
   list.querySelectorAll('.admin-card').forEach(bindCard);
@@ -106,7 +112,46 @@ async function removePhoto(sku, url) {
   loadProducts();
 }
 
-function descriptionText(form, sku) { return `${form.nombre.value}\n\n${form.descripcion.value}\n\n${form.detalle_distintivo.value}\n\nSKU: ${sku}\nConsulta por WhatsApp: https://wa.me/${WHATSAPP}`; }
+function descriptionText(form, sku) {
+  const base = Number(form.precio_base.value);
+  const multiplier = Number(form.multiplicador_minorista.value);
+  const price = base && multiplier ? `Bs ${Math.round(base * multiplier)}` : 'Consultar precio';
+  const availability = Number(form.stock.value) > 0 ? 'Disponible' : 'Agotado';
+  return applyTemplate(shareTemplate, {
+    nombre: form.nombre.value.trim(), descripcion: form.descripcion.value.trim(),
+    detalle: form.detalle_distintivo.value.trim(), precio: price,
+    disponibilidad: availability, codigo: sku,
+    enlace: new URL('../', location.href).href
+  });
+}
+
+function applyTemplate(template, values) {
+  return template.replace(/\{(nombre|descripcion|detalle|precio|disponibilidad|codigo|enlace)\}/g, (_match, key) => values[key] ?? '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function updateTemplatePreview() {
+  const template = document.querySelector('#share-template').value;
+  document.querySelector('#template-preview').textContent = applyTemplate(template, {
+    nombre:'Set Ejecutivo TOMI para Caballero', descripcion:'Un set de estilo sobrio y funcional.',
+    detalle:'Incluye reloj de pulsera, billetera y bolígrafo.', precio:'Bs 180',
+    disponibilidad:'Disponible', codigo:'GFT-M-003-NE', enlace:new URL('../', location.href).href
+  });
+}
+
+document.querySelector('#share-template').addEventListener('input', updateTemplatePreview);
+document.querySelector('#reset-template').addEventListener('click', () => {
+  document.querySelector('#share-template').value = DEFAULT_TEMPLATE;
+  updateTemplatePreview();
+});
+document.querySelector('#template-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const message = document.querySelector('#template-message');
+  const template = document.querySelector('#share-template').value.trim();
+  message.textContent = 'Guardando…';
+  const { error } = await db.from('configuracion_publica').update({ plantilla_whatsapp: template, actualizado_en: new Date().toISOString() }).eq('id', 'catalogo');
+  if (error) message.textContent = `No se guardó: ${error.message}`;
+  else { shareTemplate = template; message.textContent = 'Plantilla guardada.'; }
+});
 async function share(value, imageUrl, productName) {
   if (navigator.share && imageUrl) {
     try {

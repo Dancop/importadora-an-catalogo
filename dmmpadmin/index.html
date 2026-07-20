@@ -30,6 +30,20 @@
         <div><p class="eyebrow">Importadora A&amp;N</p><h1>Productos</h1></div>
         <button id="logout" class="button secondary">Salir</button>
       </header>
+      <section class="message-settings">
+        <details>
+          <summary>Configurar mensaje compartido</summary>
+          <form id="template-form">
+            <label>Plantilla de WhatsApp
+              <textarea id="share-template" rows="11" required></textarea>
+            </label>
+            <p class="template-help">Variables disponibles: <code>{nombre}</code> <code>{descripcion}</code> <code>{detalle}</code> <code>{precio}</code> <code>{disponibilidad}</code> <code>{codigo}</code> <code>{enlace}</code></p>
+            <div class="template-preview"><strong>Vista previa</strong><pre id="template-preview"></pre></div>
+            <p id="template-message" class="form-message"></p>
+            <div class="admin-actions"><button class="button primary" type="submit">Guardar plantilla</button><button id="reset-template" class="button secondary" type="button">Restaurar formato recomendado</button></div>
+          </form>
+        </details>
+      </section>
       <div id="admin-status" class="status">Cargando inventario…</div>
       <div id="admin-products" class="admin-products"></div>
     </section>
@@ -37,4 +51,3 @@
   <script type="module" src="../js/admin.js"></script>
 </body>
 </html>
-

@@ -8,6 +8,7 @@ const list = document.querySelector('#admin-products');
 const status = document.querySelector('#admin-status');
 const DEFAULT_TEMPLATE = `*{nombre}*\n\n{descripcion}\n\n*Incluye y presentación:*\n{detalle}\n\n*Precio:* {precio}\n*Disponibilidad:* {disponibilidad}\n*Código:* {codigo}\n\n{enlace}`;
 let shareTemplate = DEFAULT_TEMPLATE;
+let catalogConfig = { nombre_empresa:'Importadora A&N', mostrar_precios:false, logo_url:null };
 
 document.querySelector('#login-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -23,7 +24,8 @@ document.querySelectorAll('[data-admin-panel]').forEach(button => button.addEven
   document.querySelectorAll('[data-admin-panel]').forEach(item => item.classList.toggle('active', item === button));
   document.querySelector('#products-panel').hidden = target !== 'products-panel';
   document.querySelector('#whatsapp-panel').hidden = target !== 'whatsapp-panel';
-  document.querySelector('#admin-title').textContent = target === 'products-panel' ? 'Productos' : 'WhatsApp';
+  document.querySelector('#catalog-settings-panel').hidden = target !== 'catalog-settings-panel';
+  document.querySelector('#admin-title').textContent = target === 'products-panel' ? 'Productos' : target === 'catalog-settings-panel' ? 'Catálogo' : 'WhatsApp';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }));
 
@@ -37,10 +39,19 @@ async function loadProducts() {
   const [{ data: products, error: publicError }, { data: inventory, error: privateError }, { data: config }] = await Promise.all([
     db.from('productos_publicos').select('*').order('orden'),
     db.from('inventario_privado').select('*'),
-    db.from('configuracion_publica').select('plantilla_whatsapp').eq('id', 'catalogo').single()
+    db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id', 'catalogo').single()
   ]);
   if (publicError || privateError) { status.textContent = 'Esta cuenta no tiene autorización o no se pudo cargar el inventario.'; return; }
   shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;
+  catalogConfig = {
+    nombre_empresa: config?.nombre_empresa?.trim() || 'Importadora A&N',
+    mostrar_precios: config?.mostrar_precios === true,
+    logo_url: config?.logo_url || null
+  };
+  document.querySelector('#company-name').value = catalogConfig.nombre_empresa;
+  document.querySelector('#show-prices').checked = catalogConfig.mostrar_precios;
+  document.querySelector('#brand-logo-preview').src = catalogConfig.logo_url || '../assets/logo.png';
+  document.querySelector('#admin-company-name').textContent = catalogConfig.nombre_empresa;
   document.querySelector('#share-template').value = shareTemplate;
   updateTemplatePreview();
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
@@ -111,6 +122,38 @@ function compress(file) {
     img.onerror = () => reject(new Error('La fotografía no es válida.')); img.src = url;
   });
 }
+
+document.querySelector('#company-logo').addEventListener('change', event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.querySelector('#brand-logo-preview').src = URL.createObjectURL(file);
+});
+
+document.querySelector('#catalog-settings-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const message = document.querySelector('#catalog-settings-message');
+  const name = document.querySelector('#company-name').value.trim();
+  const logoFile = document.querySelector('#company-logo').files[0];
+  message.textContent = 'Guardando configuración…';
+  let logoUrl = catalogConfig.logo_url;
+  try {
+    if (logoFile) {
+      const blob = await compress(logoFile);
+      const path = `marca/logo-${Date.now()}.jpg`;
+      const { error: uploadError } = await db.storage.from('productos').upload(path, blob, { contentType:'image/jpeg' });
+      if (uploadError) throw uploadError;
+      logoUrl = db.storage.from('productos').getPublicUrl(path).data.publicUrl;
+    }
+    const update = { nombre_empresa:name, logo_url:logoUrl, mostrar_precios:document.querySelector('#show-prices').checked, actualizado_en:new Date().toISOString() };
+    const { error } = await db.from('configuracion_publica').update(update).eq('id','catalogo');
+    if (error) throw error;
+    catalogConfig = update;
+    document.querySelector('#admin-company-name').textContent = name;
+    document.querySelector('#brand-logo-preview').src = logoUrl || '../assets/logo.png';
+    document.querySelector('#company-logo').value = '';
+    message.textContent = 'Configuración guardada. El catálogo ya fue actualizado.';
+  } catch (error) { message.textContent = `No se guardó: ${error.message}`; }
+});
 
 async function removePhoto(sku, url) {
   if (!confirm('¿Eliminar esta fotografía?')) return;

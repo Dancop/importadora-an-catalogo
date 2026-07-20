@@ -27,13 +27,27 @@
 
     <section id="admin-view" hidden>
       <header class="admin-header">
-        <div><p class="eyebrow">Importadora A&amp;N</p><h1 id="admin-title">Productos</h1></div>
-        <button id="logout" class="button secondary">Salir</button>
+        <div><p id="admin-company-name" class="eyebrow">Importadora A&amp;N</p><h1 id="admin-title">Productos</h1></div>
+        <div class="header-actions"><a class="button secondary" href="../" target="_blank" rel="noopener">Ver catálogo</a><button id="logout" class="button secondary">Salir</button></div>
       </header>
       <nav class="admin-menu" aria-label="Menú de administración">
         <button class="admin-menu-item active" data-admin-panel="products-panel"><span>▦</span><strong>Productos</strong><small>Inventario y fotografías</small></button>
+        <button class="admin-menu-item" data-admin-panel="catalog-settings-panel"><span>◇</span><strong>Catálogo</strong><small>Nombre, logo y precios</small></button>
         <button class="admin-menu-item" data-admin-panel="whatsapp-panel"><span>◉</span><strong>Mensaje WhatsApp</strong><small>Formato para compartir</small></button>
       </nav>
+      <section id="catalog-settings-panel" class="catalog-settings" hidden>
+        <div class="settings-heading"><p class="eyebrow">Catálogo público</p><h2>Identidad y precios</h2><p>Estos cambios se mostrarán automáticamente en el catálogo público.</p></div>
+        <form id="catalog-settings-form">
+          <label>Nombre de la empresa<input id="company-name" type="text" maxlength="80" value="Importadora A&N" required></label>
+          <div class="brand-editor">
+            <img id="brand-logo-preview" src="../assets/logo.png" alt="Logotipo actual">
+            <label>Cambiar logotipo<input id="company-logo" type="file" accept="image/jpeg,image/png,image/webp"><small>Usa una imagen cuadrada. Se comprimirá automáticamente.</small></label>
+          </div>
+          <label class="setting-toggle"><span><strong>Mostrar precios en el catálogo</strong><small>Si está desactivado, los visitantes verán “Consultar por WhatsApp”.</small></span><input id="show-prices" type="checkbox"><i aria-hidden="true"></i></label>
+          <p id="catalog-settings-message" class="form-message"></p>
+          <button class="button primary" type="submit">Guardar configuración</button>
+        </form>
+      </section>
       <section id="whatsapp-panel" class="message-settings" hidden>
         <div class="settings-heading">
           <div><p class="eyebrow">WhatsApp</p><h2>Mensaje para compartir</h2><p>Edita el texto que acompañará la fotografía. Los campos entre llaves se completan automáticamente para cada producto.</p></div>

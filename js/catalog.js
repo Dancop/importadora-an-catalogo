@@ -9,10 +9,16 @@ const content = document.querySelector('#dialog-content');
 let groups = [];
 const DEFAULT_TEMPLATE = `*{nombre}*\n\n{descripcion}\n\n*Incluye y presentación:*\n{detalle}\n\n*Precio:* {precio}\n*Disponibilidad:* {disponibilidad}\n*Código:* {codigo}\n\n{enlace}`;
 let shareTemplate = DEFAULT_TEMPLATE;
+let showPrices = false;
+let companyName = 'Importadora A&N';
+let brandLogo = './assets/logo.png';
 
-document.querySelectorAll('[data-whatsapp-general]').forEach(a => {
-  a.href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent('Hola, quisiera consultar por los productos de Importadora A&N.')}`;
-});
+function applyBrand() {
+  document.querySelectorAll('[data-brand-name]').forEach(el => el.textContent = companyName);
+  document.querySelectorAll('[data-brand-logo]').forEach(el => el.src = brandLogo);
+  document.querySelectorAll('[data-whatsapp-general]').forEach(a => a.href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hola, quisiera consultar por los productos de ${companyName}.`)}`);
+  document.title = `${companyName} | Catálogo`;
+}
 
 const money = value => value == null ? 'Consultar precio' : `Bs ${Number(value).toLocaleString('es-BO')}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -30,13 +36,13 @@ function cover(product) {
   const image = product.variants.flatMap(v => v.imagenes || [])[0];
   return image
     ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.nombre)}" loading="lazy">`
-    : `<div class="image-placeholder"><img src="./assets/logo.png" alt=""><span>Fotografía próximamente</span></div>`;
+    : `<div class="image-placeholder"><img src="${escapeHtml(brandLogo)}" alt=""><span>Fotografía próximamente</span></div>`;
 }
 
 function card(product) {
   const available = product.variants.some(v => v.disponible);
   const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
-  const price = prices.length ? money(Math.min(...prices)) : 'Consultar precio';
+  const price = showPrices && prices.length ? money(Math.min(...prices)) : 'Consultar por WhatsApp';
   return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}">
     <div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span></div>
     <div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(product.nombre)}</h3>
@@ -55,7 +61,7 @@ function openProduct(code) {
   const images = product.variants.flatMap(v => v.imagenes || []);
   content.innerHTML = `<div class="dialog-gallery">${images.length ? images.map(url => `<img src="${escapeHtml(url)}" alt="${escapeHtml(product.nombre)}">`).join('') : cover(product)}</div>
     <div class="dialog-details"><p class="eyebrow">${escapeHtml(product.categoria)}</p><h2>${escapeHtml(product.nombre)}</h2><p>${escapeHtml(product.descripcion)}</p>
-    <h3>Presentaciones</h3><div class="variants">${product.variants.map(v => `<div><div><strong>${escapeHtml(v.color_caja || 'Presentación')}</strong>${v.color_interior ? `<span>Interior ${escapeHtml(v.color_interior)}</span>` : ''}</div><p>${escapeHtml(v.detalle_distintivo)}</p><footer><span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span><strong>${money(v.precio_minorista)}</strong></footer></div>`).join('')}</div>
+    <h3>Presentaciones</h3><div class="variants">${product.variants.map(v => `<div><div><strong>${escapeHtml(v.color_caja || 'Presentación')}</strong>${v.color_interior ? `<span>Interior ${escapeHtml(v.color_interior)}</span>` : ''}</div><p>${escapeHtml(v.detalle_distintivo)}</p><footer><span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span><strong>${showPrices ? money(v.precio_minorista) : 'Consultar por WhatsApp'}</strong></footer></div>`).join('')}</div>
     <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" href="https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hola, quisiera consultar por ${product.nombre} (${product.codigo_modelo}).`)}">Consultar por WhatsApp</a><button id="share-product" class="button secondary">Compartir</button></div></div>`;
   content.querySelector('#share-product').addEventListener('click', () => shareProduct(product, images[0]));
   dialog.showModal();
@@ -63,9 +69,9 @@ function openProduct(code) {
 
 async function shareProduct(product, imageUrl) {
   const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
-  const priceText = prices.length
+  const priceText = showPrices && prices.length
     ? (Math.min(...prices) === Math.max(...prices) ? money(prices[0]) : `Desde ${money(Math.min(...prices))}`)
-    : 'Consultar precio';
+    : 'Consultar por WhatsApp';
   const available = product.variants.some(v => v.disponible) ? 'Disponible' : 'Agotado';
   const presentations = product.variants.map(v => `• Caja ${v.color_caja}${v.color_interior ? `, interior ${v.color_interior}` : ''}`).join('\n');
   const text = applyTemplate(shareTemplate, {
@@ -109,10 +115,14 @@ document.querySelectorAll('.filter').forEach(button => button.addEventListener('
 async function load() {
   const [{ data, error }, { data: config }] = await Promise.all([
     db.from('productos_publicos').select('*').order('orden'),
-    db.from('configuracion_publica').select('plantilla_whatsapp').eq('id', 'catalogo').single()
+    db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id', 'catalogo').single()
   ]);
   if (error) { status.textContent = 'No pudimos cargar el catálogo. Intenta nuevamente.'; return; }
-  shareTemplate = config?.plantilla_whatsapp || DEFAULT_TEMPLATE;
+  shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;
+  showPrices = config?.mostrar_precios === true;
+  companyName = config?.nombre_empresa?.trim() || 'Importadora A&N';
+  brandLogo = config?.logo_url || './assets/logo.png';
+  applyBrand();
   groups = groupProducts(data); status.hidden = true; render();
 }
 load();

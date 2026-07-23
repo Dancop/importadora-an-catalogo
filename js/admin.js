@@ -68,18 +68,38 @@ function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
   const thumbnail = firstImage || '../assets/logo.png';
   const stock = Number(i.stock || 0);
-  const wholesalePrice = formatAdminPrice(i.precio_mayorista);
-  const retailPrice = formatAdminPrice(i.precio_minorista);
+  const wholesaleValue = i.precio_mayorista ?? '';
+  const retailValue = i.precio_minorista ?? '';
+  const wholesalePrice = formatAdminPrice(wholesaleValue);
+  const retailPrice = formatAdminPrice(retailValue);
+  const wholesaleMultiplier = calculateMultiplier(i.precio_base, wholesaleValue, i.multiplicador_mayorista);
+  const retailMultiplier = calculateMultiplier(i.precio_base, retailValue, i.multiplicador_minorista);
   const searchText = normalizeSearch([p.sku, p.nombre, p.color_caja, p.descripcion, p.detalle_distintivo].filter(Boolean).join(' '));
-  return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}"><header><div class="admin-product-heading"><img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}"><div><small>${text(p.sku)}</small><h2>${text(p.nombre)}</h2><span>${text(p.color_caja || '')}</span></div></div><div class="admin-card-metrics"><span class="availability ${stock > 0 ? '' : 'out'}">Stock <strong>${stock}</strong></span><span class="price-pill wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${wholesalePrice}</strong></span><span class="price-pill retail-pill"><small>Minorista</small><strong data-card-retail>${retailPrice}</strong></span></div></header>
+  return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}"><header><div class="admin-product-heading"><img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}"><div><small>${text(p.sku)}</small><h2>${text(p.nombre)}</h2><span>${text(p.color_caja || '')}</span></div></div><div class="admin-card-metrics"><span class="availability ${stock > 0 ? '' : 'out'}">Stock <strong data-card-stock>${stock}</strong></span><span class="price-pill wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${wholesalePrice}</strong></span><span class="price-pill retail-pill"><small>Minorista</small><strong data-card-retail>${retailPrice}</strong></span></div></header>
   <details><summary>Editar producto</summary><form>
     <label>Nombre<input name="nombre" value="${attr(p.nombre)}" required></label>
-    <label>Descripción<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
-    <label>Contenido y presentación<textarea name="detalle_distintivo" rows="4">${text(p.detalle_distintivo)}</textarea></label>
-    <div class="field-grid"><label>Stock exacto<input name="stock" type="number" min="0" value="${i.stock}"></label><label>Precio base<input name="precio_base" type="number" min="0" step="0.01" value="${i.precio_base ?? ''}"></label></div>
-    <div class="price-box wholesale"><div><label>Multiplicador mayorista<input name="multiplicador_mayorista" type="number" min="0" step="0.01" value="${i.multiplicador_mayorista ?? ''}"></label><p>Resultado: <strong data-wholesale>Bs ${i.precio_mayorista ?? '—'}</strong></p></div></div>
-    <div class="price-box retail"><div><label>Multiplicador minorista<input name="multiplicador_minorista" type="number" min="0" step="0.01" value="${i.multiplicador_minorista ?? ''}"></label><p>Resultado: <strong data-retail>Bs ${i.precio_minorista ?? '—'}</strong></p></div></div>
-    <label>Fotografías<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure><a href="${url}" target="_blank"><img src="${url}" alt="Foto ${n+1}"></a><button type="button" data-remove-photo="${url}">Eliminar</button></figure>`).join('')}</div>
+
+    <section class="admin-form-section commercial-section" aria-labelledby="commercial-${attr(p.sku)}">
+      <div class="admin-section-heading"><div><span class="section-step">1</span><div><h3 id="commercial-${attr(p.sku)}">Stock y precios</h3><p>Ingresa los precios finales de venta.</p></div></div></div>
+      <div class="field-grid commercial-main-fields"><label>Stock disponible<input name="stock" type="number" min="0" value="${i.stock ?? 0}"></label><label>Costo base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${i.precio_base ?? ''}"></label></div>
+      <div class="sale-price-grid">
+        <div class="price-box wholesale"><label>Precio mayor (Bs)<input name="precio_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleValue}"></label><p>Multiplicador calculado: <strong data-wholesale-multiplier>${formatMultiplier(wholesaleMultiplier)}</strong></p><input name="multiplicador_mayorista" type="hidden" value="${wholesaleMultiplier ?? ''}"></div>
+        <div class="price-box retail"><label>Precio menor (Bs)<input name="precio_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailValue}"></label><p>Multiplicador calculado: <strong data-retail-multiplier>${formatMultiplier(retailMultiplier)}</strong></p><input name="multiplicador_minorista" type="hidden" value="${retailMultiplier ?? ''}"></div>
+      </div>
+      <p class="price-helper">El multiplicador se obtiene automáticamente al dividir el precio entre el costo base.</p>
+    </section>
+
+    <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
+      <div class="admin-section-heading"><div><span class="section-step">2</span><div><h3 id="content-${attr(p.sku)}">Información del producto</h3><p>Texto que verá el cliente en el catálogo.</p></div></div></div>
+      <label>Descripción<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
+      <label>Contenido y presentación<textarea name="detalle_distintivo" rows="4">${text(p.detalle_distintivo)}</textarea></label>
+    </section>
+
+    <section class="admin-form-section photos-section" aria-labelledby="photos-${attr(p.sku)}">
+      <div class="admin-section-heading"><div><span class="section-step">3</span><div><h3 id="photos-${attr(p.sku)}">Fotografías</h3><p>Agrega hasta seis imágenes del producto.</p></div></div></div>
+      <label>Seleccionar fotografías<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure><a href="${url}" target="_blank"><img src="${url}" alt="Foto ${n+1}"></a><button type="button" data-remove-photo="${url}">Eliminar</button></figure>`).join('')}</div>
+    </section>
+
     <p class="form-message" data-message></p><div class="admin-actions"><button class="button primary" type="submit">Guardar cambios</button><button class="button secondary" type="button" data-copy>Copiar descripción</button><button class="button whatsapp" type="button" data-share>Compartir</button></div>
   </form></details></article>`;
 }
@@ -88,16 +108,26 @@ function bindCard(card) {
   const form = card.querySelector('form');
   const calculate = () => {
     const base = Number(form.precio_base.value);
-    const wholesale = Number(form.multiplicador_mayorista.value);
-    const retail = Number(form.multiplicador_minorista.value);
-    const wholesaleText = base && wholesale ? `Bs ${Math.round(base * wholesale)}` : 'Bs —';
-    const retailText = base && retail ? `Bs ${Math.round(base * retail)}` : 'Bs —';
-    form.querySelector('[data-wholesale]').textContent = wholesaleText;
-    form.querySelector('[data-retail]').textContent = retailText;
-    card.querySelector('[data-card-wholesale]').textContent = wholesaleText;
-    card.querySelector('[data-card-retail]').textContent = retailText;
+    const wholesalePrice = Number(form.precio_mayorista.value);
+    const retailPrice = Number(form.precio_minorista.value);
+    const wholesaleMultiplier = base > 0 && wholesalePrice >= 0 ? wholesalePrice / base : null;
+    const retailMultiplier = base > 0 && retailPrice >= 0 ? retailPrice / base : null;
+
+    form.multiplicador_mayorista.value = wholesaleMultiplier === null ? '' : roundMultiplier(wholesaleMultiplier);
+    form.multiplicador_minorista.value = retailMultiplier === null ? '' : roundMultiplier(retailMultiplier);
+    form.querySelector('[data-wholesale-multiplier]').textContent = formatMultiplier(wholesaleMultiplier);
+    form.querySelector('[data-retail-multiplier]').textContent = formatMultiplier(retailMultiplier);
+    card.querySelector('[data-card-wholesale]').textContent = formatAdminPrice(form.precio_mayorista.value);
+    card.querySelector('[data-card-retail]').textContent = formatAdminPrice(form.precio_minorista.value);
   };
-  ['precio_base','multiplicador_mayorista','multiplicador_minorista'].forEach(n => form[n].addEventListener('input', calculate));
+  const updateStock = () => {
+    const stock = Math.max(0, Number(form.stock.value) || 0);
+    const badge = card.querySelector('.admin-card-metrics .availability');
+    card.querySelector('[data-card-stock]').textContent = stock;
+    badge.classList.toggle('out', stock <= 0);
+  };
+  ['precio_base','precio_mayorista','precio_minorista'].forEach(n => form[n].addEventListener('input', calculate));
+  form.stock.addEventListener('input', updateStock);
   form.addEventListener('submit', e => save(e, card.dataset.sku));
   form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
   form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
@@ -111,7 +141,7 @@ async function save(event, sku) {
   try { images = images.concat(await uploadPhotos(sku, [...form.photos.files], images.length)); }
   catch (e) { message.textContent = e.message; return; }
   const publicData = { nombre: form.nombre.value.trim(), descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), imagenes: images };
-  const privateData = { stock: Number(form.stock.value), precio_base: form.precio_base.value === '' ? null : Number(form.precio_base.value), multiplicador_mayorista: Number(form.multiplicador_mayorista.value), multiplicador_minorista: Number(form.multiplicador_minorista.value) };
+  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value) };
   const [{ error: e1 }, { error: e2 }] = await Promise.all([db.from('productos_publicos').update(publicData).eq('sku', sku), db.from('inventario_privado').update(privateData).eq('sku', sku)]);
   if (e1 || e2) message.textContent = `No se guardó: ${(e1 || e2).message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }
 }
@@ -178,9 +208,8 @@ async function removePhoto(sku, url) {
 }
 
 function descriptionText(form, sku) {
-  const base = Number(form.precio_base.value);
-  const multiplier = Number(form.multiplicador_minorista.value);
-  const price = base && multiplier ? `Bs ${Math.round(base * multiplier)}` : 'Consultar precio';
+  const retailPrice = Number(form.precio_minorista.value);
+  const price = retailPrice > 0 ? `Bs ${formatNumber(retailPrice)}` : 'Consultar precio';
   const availability = Number(form.stock.value) > 0 ? 'Disponible' : 'Agotado';
   return applyTemplate(shareTemplate, {
     nombre: form.nombre.value.trim(), descripcion: form.descripcion.value.trim(),
@@ -251,6 +280,31 @@ async function share(value, imageUrl, productName) {
 }
 function attr(v) { return String(v ?? '').replace(/[&"]/g, c => c === '&' ? '&amp;' : '&quot;'); }
 function text(v) { return String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function calculateMultiplier(baseValue, priceValue, fallbackValue = null) {
+  const base = Number(baseValue);
+  const price = Number(priceValue);
+  if (base > 0 && Number.isFinite(price)) return roundMultiplier(price / base);
+  const fallback = Number(fallbackValue);
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : null;
+}
+
+function roundMultiplier(value) {
+  return Math.round(Number(value) * 10000) / 10000;
+}
+
+function formatMultiplier(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? `${amount.toFixed(2)}×` : '—';
+}
+
+function nullableNumber(value) {
+  return value === '' ? null : Number(value);
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(Number(value));
+}
 
 function normalizeSearch(value) {
   return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();

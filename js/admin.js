@@ -75,18 +75,24 @@ function editor(p, i) {
   const wholesaleMultiplier = calculateMultiplier(i.precio_base, wholesaleValue, i.multiplicador_mayorista);
   const retailMultiplier = calculateMultiplier(i.precio_base, retailValue, i.multiplicador_minorista);
   const searchText = normalizeSearch([p.sku, p.nombre, p.color_caja, p.descripcion, p.detalle_distintivo].filter(Boolean).join(' '));
-  return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}"><header><div class="admin-product-heading"><img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}"><div><small>${text(p.sku)}</small><h2>${text(p.nombre)}</h2><span>${text(p.color_caja || '')}</span></div></div><div class="admin-card-metrics"><span class="availability ${stock > 0 ? '' : 'out'}">Stock <strong data-card-stock>${stock}</strong></span><span class="price-pill wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${wholesalePrice}</strong></span><span class="price-pill retail-pill"><small>Minorista</small><strong data-card-retail>${retailPrice}</strong></span></div></header>
+  return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}"><header><div class="admin-product-heading"><img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}"><div><small data-card-sku>${text(p.sku)}</small><h2 data-card-name>${text(p.nombre)}</h2><span data-card-color>${text(p.color_caja || '')}</span></div></div><div class="admin-card-metrics"><span class="availability ${stock > 0 ? '' : 'out'}">Stock <strong data-card-stock>${stock}</strong></span><span class="price-pill wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${wholesalePrice}</strong></span><span class="price-pill retail-pill"><small>Minorista</small><strong data-card-retail>${retailPrice}</strong></span></div></header>
   <details><summary>Editar producto</summary><form>
-    <label>Nombre<input name="nombre" value="${attr(p.nombre)}" required></label>
+    <section class="product-identity-section" aria-label="Identificación del producto">
+      <label class="identity-name">Nombre del producto<input name="nombre" value="${attr(p.nombre)}" required></label>
+      <div class="field-grid identity-secondary-fields">
+        <label>Código / SKU<input name="sku" class="sku-input" value="${attr(p.sku)}" pattern="[A-Za-z0-9_-]+" autocomplete="off" required><small>Debe ser único. Usa letras, números y guiones.</small></label>
+        <label>Color o presentación<input name="color_caja" value="${attr(p.color_caja || '')}" autocomplete="off" placeholder="Ej.: Azul"></label>
+      </div>
+    </section>
 
     <section class="admin-form-section commercial-section" aria-labelledby="commercial-${attr(p.sku)}">
       <div class="admin-section-heading"><div><span class="section-step">1</span><div><h3 id="commercial-${attr(p.sku)}">Stock y precios</h3><p>Ingresa los precios finales de venta.</p></div></div></div>
       <div class="field-grid commercial-main-fields"><label>Stock disponible<input name="stock" type="number" min="0" value="${i.stock ?? 0}"></label><label>Costo base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${i.precio_base ?? ''}"></label></div>
       <div class="sale-price-grid">
-        <div class="price-box wholesale"><label>Precio mayor (Bs)<input name="precio_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleValue}"></label><p>Multiplicador calculado: <strong data-wholesale-multiplier>${formatMultiplier(wholesaleMultiplier)}</strong></p><input name="multiplicador_mayorista" type="hidden" value="${wholesaleMultiplier ?? ''}"></div>
-        <div class="price-box retail"><label>Precio menor (Bs)<input name="precio_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailValue}"></label><p>Multiplicador calculado: <strong data-retail-multiplier>${formatMultiplier(retailMultiplier)}</strong></p><input name="multiplicador_minorista" type="hidden" value="${retailMultiplier ?? ''}"></div>
+        <div class="price-box wholesale"><label>Precio mayor (Bs)<input name="precio_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleMultiplier ?? ''}"></label></div>
+        <div class="price-box retail"><label>Precio menor (Bs)<input name="precio_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailMultiplier ?? ''}"></label></div>
       </div>
-      <p class="price-helper">El multiplicador se obtiene automáticamente al dividir el precio entre el costo base.</p>
+      <p class="price-helper">Puedes escribir el precio final o el multiplicador. El otro valor se calculará automáticamente usando el costo base.</p>
     </section>
 
     <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
@@ -106,42 +112,75 @@ function editor(p, i) {
 
 function bindCard(card) {
   const form = card.querySelector('form');
-  const calculate = () => {
-    const base = Number(form.precio_base.value);
-    const wholesalePrice = Number(form.precio_mayorista.value);
-    const retailPrice = Number(form.precio_minorista.value);
-    const wholesaleMultiplier = base > 0 && wholesalePrice >= 0 ? wholesalePrice / base : null;
-    const retailMultiplier = base > 0 && retailPrice >= 0 ? retailPrice / base : null;
 
-    form.multiplicador_mayorista.value = wholesaleMultiplier === null ? '' : roundMultiplier(wholesaleMultiplier);
-    form.multiplicador_minorista.value = retailMultiplier === null ? '' : roundMultiplier(retailMultiplier);
-    form.querySelector('[data-wholesale-multiplier]').textContent = formatMultiplier(wholesaleMultiplier);
-    form.querySelector('[data-retail-multiplier]').textContent = formatMultiplier(retailMultiplier);
+  const updateHeader = () => {
+    const name = form.nombre.value.trim() || 'Producto sin nombre';
+    const sku = form.sku.value.trim().toUpperCase();
+    const color = form.color_caja.value.trim();
+    card.querySelector('[data-card-name]').textContent = name;
+    card.querySelector('[data-card-sku]').textContent = sku;
+    card.querySelector('[data-card-color]').textContent = color;
+    card.dataset.search = normalizeSearch([sku, name, color, form.descripcion.value, form.detalle_distintivo.value].filter(Boolean).join(' '));
+    applyProductSearch();
+  };
+
+  const updatePriceFromMultiplier = type => {
+    const base = Number(form.precio_base.value);
+    const multiplier = Number(form[`multiplicador_${type}`].value);
+    const priceInput = form[`precio_${type}`];
+    priceInput.value = base > 0 && multiplier >= 0 ? roundPrice(base * multiplier) : '';
+    updatePriceBadges();
+  };
+
+  const updateMultiplierFromPrice = type => {
+    const base = Number(form.precio_base.value);
+    const price = Number(form[`precio_${type}`].value);
+    const multiplierInput = form[`multiplicador_${type}`];
+    multiplierInput.value = base > 0 && price >= 0 ? roundMultiplier(price / base) : '';
+    updatePriceBadges();
+  };
+
+  const updatePriceBadges = () => {
     card.querySelector('[data-card-wholesale]').textContent = formatAdminPrice(form.precio_mayorista.value);
     card.querySelector('[data-card-retail]').textContent = formatAdminPrice(form.precio_minorista.value);
   };
+
+  const recalculatePricesFromMultipliers = () => {
+    updatePriceFromMultiplier('mayorista');
+    updatePriceFromMultiplier('minorista');
+  };
+
   const updateStock = () => {
     const stock = Math.max(0, Number(form.stock.value) || 0);
     const badge = card.querySelector('.admin-card-metrics .availability');
     card.querySelector('[data-card-stock]').textContent = stock;
     badge.classList.toggle('out', stock <= 0);
   };
-  ['precio_base','precio_mayorista','precio_minorista'].forEach(n => form[n].addEventListener('input', calculate));
+
+  form.precio_base.addEventListener('input', recalculatePricesFromMultipliers);
+  form.precio_mayorista.addEventListener('input', () => updateMultiplierFromPrice('mayorista'));
+  form.precio_minorista.addEventListener('input', () => updateMultiplierFromPrice('minorista'));
+  form.multiplicador_mayorista.addEventListener('input', () => updatePriceFromMultiplier('mayorista'));
+  form.multiplicador_minorista.addEventListener('input', () => updatePriceFromMultiplier('minorista'));
   form.stock.addEventListener('input', updateStock);
+  ['nombre','sku','color_caja','descripcion','detalle_distintivo'].forEach(name => form[name].addEventListener('input', updateHeader));
+  form.sku.addEventListener('blur', () => { form.sku.value = form.sku.value.trim().toUpperCase(); updateHeader(); });
   form.addEventListener('submit', e => save(e, card.dataset.sku));
-  form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
-  form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
+  form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, form.sku.value.trim().toUpperCase())));
+  form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, form.sku.value.trim().toUpperCase()), card.dataset.firstImage, form.nombre.value));
   form.querySelectorAll('[data-remove-photo]').forEach(b => b.addEventListener('click', () => removePhoto(card.dataset.sku, b.dataset.removePhoto)));
 }
 
 async function save(event, sku) {
   event.preventDefault(); const form = event.currentTarget; const message = form.querySelector('[data-message]');
   message.textContent = 'Guardando…';
+  const newSku = form.sku.value.trim().toUpperCase();
+  if (!newSku) { message.textContent = 'El código del producto es obligatorio.'; return; }
   let images = [...form.querySelectorAll('.photo-list img')].map(i => i.src);
-  try { images = images.concat(await uploadPhotos(sku, [...form.photos.files], images.length)); }
+  try { images = images.concat(await uploadPhotos(newSku, [...form.photos.files], images.length)); }
   catch (e) { message.textContent = e.message; return; }
-  const publicData = { nombre: form.nombre.value.trim(), descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), imagenes: images };
-  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value) };
+  const publicData = { sku:newSku, nombre: form.nombre.value.trim(), color_caja:form.color_caja.value.trim(), descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), imagenes: images };
+  const privateData = { sku:newSku, stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value) };
   const [{ error: e1 }, { error: e2 }] = await Promise.all([db.from('productos_publicos').update(publicData).eq('sku', sku), db.from('inventario_privado').update(privateData).eq('sku', sku)]);
   if (e1 || e2) message.textContent = `No se guardó: ${(e1 || e2).message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }
 }
@@ -289,6 +328,7 @@ function calculateMultiplier(baseValue, priceValue, fallbackValue = null) {
   return Number.isFinite(fallback) && fallback > 0 ? fallback : null;
 }
 
+function roundPrice(value) { return Math.round((Number(value) + Number.EPSILON) * 100) / 100; }
 function roundMultiplier(value) {
   return Math.round(Number(value) * 10000) / 10000;
 }

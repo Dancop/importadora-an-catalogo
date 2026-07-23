@@ -16,3 +16,7 @@
 
 @media(max-width:760px){.admin-card form{gap:13px}.admin-form-section{padding:14px}.sale-price-grid{grid-template-columns:1fr}.commercial-main-fields{grid-template-columns:1fr 1fr}.admin-section-heading p{font-size:.76rem}}
 @media(max-width:430px){.commercial-main-fields{grid-template-columns:1fr}.price-helper{font-size:.72rem}}
+
+/* Edición clara de identificación y cálculo bidireccional de precios */
+.product-identity-section{display:grid;gap:12px;padding:2px 0 4px}.identity-secondary-fields{align-items:start}.identity-secondary-fields label>small{color:var(--muted);font-size:.72rem;font-weight:400}.sku-input{text-transform:uppercase;letter-spacing:.03em}.multiplier-field{margin-top:4px;padding-top:10px;border-top:1px solid rgba(7,29,45,.12)}.multiplier-field input{font-size:.96rem!important;font-weight:700!important;background:rgba(255,255,255,.78)}
+@media(max-width:520px){.identity-secondary-fields{grid-template-columns:1fr}.product-identity-section{gap:10px}}

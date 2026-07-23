@@ -6,6 +6,10 @@ const loginView = document.querySelector('#login-view');
 const adminView = document.querySelector('#admin-view');
 const list = document.querySelector('#admin-products');
 const status = document.querySelector('#admin-status');
+const productSearch = document.querySelector('#product-search');
+const clearProductSearch = document.querySelector('#clear-product-search');
+const searchResultCount = document.querySelector('#search-result-count');
+const noSearchResults = document.querySelector('#no-search-results');
 const DEFAULT_TEMPLATE = `*{nombre}*\n\n{descripcion}\n\n*Incluye y presentación:*\n{detalle}\n\n*Precio:* {precio}\n*Disponibilidad:* {disponibilidad}\n*Código:* {codigo}\n\n{enlace}`;
 let shareTemplate = DEFAULT_TEMPLATE;
 let catalogConfig = { nombre_empresa:'Importadora A&N', mostrar_precios:false, logo_url:null };
@@ -55,14 +59,19 @@ async function loadProducts() {
   document.querySelector('#share-template').value = shareTemplate;
   updateTemplatePreview();
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
-  list.innerHTML = products.map(p => editor(p, privateMap.get(p.sku))).join(''); status.hidden = true;
+  list.innerHTML = products.map(p => editor(p, privateMap.get(p.sku) || {})).join(''); status.hidden = true;
   list.querySelectorAll('.admin-card').forEach(bindCard);
+  applyProductSearch();
 }
 
 function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
   const thumbnail = firstImage || '../assets/logo.png';
-  return `<article class="admin-card" data-sku="${p.sku}" data-first-image="${attr(firstImage)}"><header><div class="admin-product-heading"><img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}"><div><small>${p.sku}</small><h2>${p.nombre}</h2><span>${p.color_caja || ''}</span></div></div><span class="availability ${i.stock > 0 ? '' : 'out'}">Stock ${i.stock}</span></header>
+  const stock = Number(i.stock || 0);
+  const wholesalePrice = formatAdminPrice(i.precio_mayorista);
+  const retailPrice = formatAdminPrice(i.precio_minorista);
+  const searchText = normalizeSearch([p.sku, p.nombre, p.color_caja, p.descripcion, p.detalle_distintivo].filter(Boolean).join(' '));
+  return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}"><header><div class="admin-product-heading"><img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}"><div><small>${text(p.sku)}</small><h2>${text(p.nombre)}</h2><span>${text(p.color_caja || '')}</span></div></div><div class="admin-card-metrics"><span class="availability ${stock > 0 ? '' : 'out'}">Stock <strong>${stock}</strong></span><span class="price-pill wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${wholesalePrice}</strong></span><span class="price-pill retail-pill"><small>Minorista</small><strong data-card-retail>${retailPrice}</strong></span></div></header>
   <details><summary>Editar producto</summary><form>
     <label>Nombre<input name="nombre" value="${attr(p.nombre)}" required></label>
     <label>Descripción<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
@@ -81,8 +90,12 @@ function bindCard(card) {
     const base = Number(form.precio_base.value);
     const wholesale = Number(form.multiplicador_mayorista.value);
     const retail = Number(form.multiplicador_minorista.value);
-    form.querySelector('[data-wholesale]').textContent = base && wholesale ? `Bs ${Math.round(base * wholesale)}` : 'Bs —';
-    form.querySelector('[data-retail]').textContent = base && retail ? `Bs ${Math.round(base * retail)}` : 'Bs —';
+    const wholesaleText = base && wholesale ? `Bs ${Math.round(base * wholesale)}` : 'Bs —';
+    const retailText = base && retail ? `Bs ${Math.round(base * retail)}` : 'Bs —';
+    form.querySelector('[data-wholesale]').textContent = wholesaleText;
+    form.querySelector('[data-retail]').textContent = retailText;
+    card.querySelector('[data-card-wholesale]').textContent = wholesaleText;
+    card.querySelector('[data-card-retail]').textContent = retailText;
   };
   ['precio_base','multiplicador_mayorista','multiplicador_minorista'].forEach(n => form[n].addEventListener('input', calculate));
   form.addEventListener('submit', e => save(e, card.dataset.sku));
@@ -238,3 +251,33 @@ async function share(value, imageUrl, productName) {
 }
 function attr(v) { return String(v ?? '').replace(/[&"]/g, c => c === '&' ? '&amp;' : '&quot;'); }
 function text(v) { return String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function normalizeSearch(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+function formatAdminPrice(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? `Bs ${Math.round(amount)}` : 'Bs —';
+}
+
+function applyProductSearch() {
+  const cards = [...list.querySelectorAll('.admin-card')];
+  const query = normalizeSearch(productSearch.value);
+  let visible = 0;
+  cards.forEach(card => {
+    const matches = !query || card.dataset.search.includes(query);
+    card.hidden = !matches;
+    if (matches) visible += 1;
+  });
+  clearProductSearch.hidden = !query;
+  noSearchResults.hidden = visible > 0 || cards.length === 0;
+  searchResultCount.textContent = query ? `${visible} de ${cards.length} productos` : `${cards.length} productos`;
+}
+
+productSearch.addEventListener('input', applyProductSearch);
+clearProductSearch.addEventListener('click', () => {
+  productSearch.value = '';
+  applyProductSearch();
+  productSearch.focus();
+});

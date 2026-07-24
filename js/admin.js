@@ -12,7 +12,7 @@ const searchResultCount = document.querySelector('#search-result-count');
 const noSearchResults = document.querySelector('#no-search-results');
 const DEFAULT_TEMPLATE = `*{nombre}*\n\n{descripcion}\n\n*Incluye y presentación:*\n{detalle}\n\n*Precio:* {precio}\n*Disponibilidad:* {disponibilidad}\n*Código:* {codigo}\n\n{enlace}`;
 let shareTemplate = DEFAULT_TEMPLATE;
-let catalogConfig = { nombre_empresa:'Importadora A&N', mostrar_precios:false, logo_url:null };
+let catalogConfig = { nombre_empresa:'Importadora A&N', mostrar_precios:false, mostrar_costo_admin:false, logo_url:null };
 
 document.querySelector('#login-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -43,17 +43,19 @@ async function loadProducts() {
   const [{ data: products, error: publicError }, { data: inventory, error: privateError }, { data: config }] = await Promise.all([
     db.from('productos_publicos').select('*').order('orden'),
     db.from('inventario_privado').select('*'),
-    db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id', 'catalogo').single()
+    db.from('configuracion_publica').select('*').eq('id', 'catalogo').single()
   ]);
   if (publicError || privateError) { status.textContent = 'Esta cuenta no tiene autorización o no se pudo cargar el inventario.'; return; }
   shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;
   catalogConfig = {
     nombre_empresa: config?.nombre_empresa?.trim() || 'Importadora A&N',
     mostrar_precios: config?.mostrar_precios === true,
+    mostrar_costo_admin: config?.mostrar_costo_admin === true,
     logo_url: config?.logo_url || null
   };
   document.querySelector('#company-name').value = catalogConfig.nombre_empresa;
   document.querySelector('#show-prices').checked = catalogConfig.mostrar_precios;
+  document.querySelector('#show-admin-cost').checked = catalogConfig.mostrar_costo_admin;
   document.querySelector('#brand-logo-preview').src = catalogConfig.logo_url || '../assets/logo.png';
   document.querySelector('#admin-company-name').textContent = catalogConfig.nombre_empresa;
   document.querySelector('#share-template').value = shareTemplate;
@@ -73,8 +75,8 @@ function editor(p, i) {
   const ownCostValue = i.costo_propio ?? calculateOwnCost(baseValue, costFactor);
   const wholesaleValue = i.precio_mayorista ?? '';
   const retailValue = i.precio_minorista ?? '';
-  const wholesaleMultiplier = calculateMultiplier(ownCostValue, wholesaleValue, i.multiplicador_mayorista);
-  const retailMultiplier = calculateMultiplier(ownCostValue, retailValue, i.multiplicador_minorista);
+  const wholesaleMultiplier = calculateMultiplier(baseValue, wholesaleValue, i.multiplicador_mayorista);
+  const retailMultiplier = calculateMultiplier(baseValue, retailValue, i.multiplicador_minorista);
   const searchText = normalizeSearch([p.sku, p.codigo_modelo, p.nombre, p.color_caja, p.color_interior, p.descripcion, p.detalle_distintivo].filter(Boolean).join(' '));
   return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}">
     <header class="admin-card-summary">
@@ -88,7 +90,7 @@ function editor(p, i) {
       </div>
       <div class="admin-card-metrics" aria-label="Resumen comercial">
         <span class="metric-tile stock-tile ${stock > 0 ? '' : 'out'}"><small>Stock</small><strong data-card-stock>${stock}</strong></span>
-        <span class="metric-tile cost-tile"><small>Mi costo</small><strong data-card-cost>${formatAdminPrice(ownCostValue)}</strong></span>
+        <span class="metric-tile cost-tile ${catalogConfig.mostrar_costo_admin ? 'cost-visible' : 'cost-hidden'}"><small>Mi costo</small><strong data-card-cost data-cost-value="${attr(ownCostValue)}">${catalogConfig.mostrar_costo_admin ? formatAdminPrice(ownCostValue) : '••••••'}</strong><button class="cost-visibility-button" type="button" data-toggle-cost aria-label="${catalogConfig.mostrar_costo_admin ? 'Ocultar mi costo' : 'Mostrar mi costo'}">${catalogConfig.mostrar_costo_admin ? 'Ocultar' : 'Mostrar'}</button></span>
         <span class="metric-tile wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${formatAdminPrice(wholesaleValue)}</strong></span>
         <span class="metric-tile retail-pill"><small>Minorista</small><strong data-card-retail>${formatAdminPrice(retailValue)}</strong></span>
       </div>
@@ -170,7 +172,7 @@ function bindCard(card) {
   };
 
   const updatePriceFromMultiplier = type => {
-    const base = Number(form.costo_propio.value);
+    const base = Number(form.precio_base.value);
     const multiplier = Number(form[`multiplicador_${type}`].value);
     const priceInput = form[`precio_${type}`];
     priceInput.value = base > 0 && multiplier >= 0 ? roundPrice(base * multiplier) : '';
@@ -178,7 +180,7 @@ function bindCard(card) {
   };
 
   const updateMultiplierFromPrice = type => {
-    const base = Number(form.costo_propio.value);
+    const base = Number(form.precio_base.value);
     const price = Number(form[`precio_${type}`].value);
     const multiplierInput = form[`multiplicador_${type}`];
     multiplierInput.value = base > 0 && price >= 0 ? roundMultiplier(price / base) : '';
@@ -186,7 +188,9 @@ function bindCard(card) {
   };
 
   const updatePriceBadges = () => {
-    card.querySelector('[data-card-cost]').textContent = formatAdminPrice(form.costo_propio.value);
+    const costDisplay = card.querySelector('[data-card-cost]');
+    costDisplay.dataset.costValue = form.costo_propio.value;
+    if (card.querySelector('.cost-tile').classList.contains('cost-visible')) costDisplay.textContent = formatAdminPrice(form.costo_propio.value);
     card.querySelector('[data-card-wholesale]').textContent = formatAdminPrice(form.precio_mayorista.value);
     card.querySelector('[data-card-retail]').textContent = formatAdminPrice(form.precio_minorista.value);
   };
@@ -225,6 +229,17 @@ function bindCard(card) {
   form.querySelectorAll('[data-remove-photo]').forEach(b => b.addEventListener('click', () => removePhoto(card.dataset.sku, b.dataset.removePhoto)));
 }
 
+function toggleCardCost(card, button) {
+  const tile = card.querySelector('.cost-tile');
+  const value = card.querySelector('[data-card-cost]');
+  const show = tile.classList.contains('cost-hidden');
+  tile.classList.toggle('cost-hidden', !show);
+  tile.classList.toggle('cost-visible', show);
+  value.textContent = show ? formatAdminPrice(value.dataset.costValue) : '••••••';
+  button.textContent = show ? 'Ocultar' : 'Mostrar';
+  button.setAttribute('aria-label', show ? 'Ocultar mi costo' : 'Mostrar mi costo');
+}
+
 async function save(event, sku) {
   event.preventDefault(); const form = event.currentTarget; const message = form.querySelector('[data-message]');
   message.textContent = 'Guardando…';
@@ -234,7 +249,7 @@ async function save(event, sku) {
   catch (e) { message.textContent = e.message; return; }
   const retailPrice = nullableNumber(form.precio_minorista.value);
   const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), precio_minorista: retailPrice, imagenes: images, actualizado_en:new Date().toISOString() };
-  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), precio_mayorista: nullableNumber(form.precio_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), precio_minorista: retailPrice, actualizado_en:new Date().toISOString() };
+  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), actualizado_en:new Date().toISOString() };
   const [{ error: e1 }, { error: e2 }] = await Promise.all([db.from('productos_publicos').update(publicData).eq('sku', sku), db.from('inventario_privado').update(privateData).eq('sku', sku)]);
   if (e1 || e2) message.textContent = `No se guardó: ${(e1 || e2).message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }
 }
@@ -280,7 +295,7 @@ document.querySelector('#catalog-settings-form').addEventListener('submit', asyn
       if (uploadError) throw uploadError;
       logoUrl = db.storage.from('productos').getPublicUrl(path).data.publicUrl;
     }
-    const update = { nombre_empresa:name, logo_url:logoUrl, mostrar_precios:document.querySelector('#show-prices').checked, actualizado_en:new Date().toISOString() };
+    const update = { nombre_empresa:name, logo_url:logoUrl, mostrar_precios:document.querySelector('#show-prices').checked, mostrar_costo_admin:document.querySelector('#show-admin-cost').checked, actualizado_en:new Date().toISOString() };
     const { error } = await db.from('configuracion_publica').update(update).eq('id','catalogo');
     if (error) throw error;
     catalogConfig = update;

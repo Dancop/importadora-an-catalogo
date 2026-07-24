@@ -170,3 +170,13 @@
   .sticky-save-actions .button{width:auto!important;flex:1;padding:10px 8px;font-size:.78rem}
   .sticky-save-actions .primary{flex-basis:100%;order:-1}
 }
+
+/* Privacidad de costos en el panel */
+.cost-tile { position: relative; }
+.cost-visibility-button {
+  appearance: none; border: 0; background: transparent; padding: 2px 0 0;
+  color: inherit; font: inherit; font-size: .72rem; text-decoration: underline;
+  cursor: pointer; opacity: .78;
+}
+.cost-visibility-button:hover { opacity: 1; }
+.cost-hidden [data-card-cost] { letter-spacing: .08em; }

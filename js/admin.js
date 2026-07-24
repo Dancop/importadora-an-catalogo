@@ -68,59 +68,85 @@ function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
   const thumbnail = firstImage || '../assets/logo.png';
   const stock = Number(i.stock || 0);
+  const baseValue = i.precio_base ?? '';
   const wholesaleValue = i.precio_mayorista ?? '';
   const retailValue = i.precio_minorista ?? '';
-  const wholesalePrice = formatAdminPrice(wholesaleValue);
-  const retailPrice = formatAdminPrice(retailValue);
-  const wholesaleMultiplier = calculateMultiplier(i.precio_base, wholesaleValue, i.multiplicador_mayorista);
-  const retailMultiplier = calculateMultiplier(i.precio_base, retailValue, i.multiplicador_minorista);
-  const searchText = normalizeSearch([p.sku, p.nombre, p.color_caja, p.descripcion, p.detalle_distintivo].filter(Boolean).join(' '));
-  return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}"><header><div class="admin-product-heading"><img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}"><div><small data-card-sku>${text(p.sku)}</small><h2 data-card-name>${text(p.nombre)}</h2><span data-card-color>${text(p.color_caja || '')}</span></div></div><div class="admin-card-metrics"><span class="availability ${stock > 0 ? '' : 'out'}">Stock <strong data-card-stock>${stock}</strong></span><span class="price-pill wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${wholesalePrice}</strong></span><span class="price-pill retail-pill"><small>Minorista</small><strong data-card-retail>${retailPrice}</strong></span></div></header>
-  <details><summary>Editar producto</summary><form>
-    <section class="product-identity-section" aria-label="Identificación del producto">
-      <label class="identity-name">Nombre del producto<input name="nombre" value="${attr(p.nombre)}" required></label>
-      <div class="field-grid identity-secondary-fields">
-        <label>Código / SKU<input name="sku" class="sku-input" value="${attr(p.sku)}" pattern="[A-Za-z0-9_-]+" autocomplete="off" required><small>Debe ser único. Usa letras, números y guiones.</small></label>
-        <label>Color o presentación<input name="color_caja" value="${attr(p.color_caja || '')}" autocomplete="off" placeholder="Ej.: Azul"></label>
+  const wholesaleMultiplier = calculateMultiplier(baseValue, wholesaleValue, i.multiplicador_mayorista);
+  const retailMultiplier = calculateMultiplier(baseValue, retailValue, i.multiplicador_minorista);
+  const searchText = normalizeSearch([p.sku, p.codigo_modelo, p.nombre, p.color_caja, p.color_interior, p.descripcion, p.detalle_distintivo].filter(Boolean).join(' '));
+  return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}">
+    <header class="admin-card-summary">
+      <div class="admin-product-heading">
+        <img class="admin-thumb" src="${attr(thumbnail)}" alt="Miniatura de ${attr(p.nombre)}">
+        <div class="admin-product-copy">
+          <small data-card-sku>${text(p.sku)}</small>
+          <h2 data-card-name>${text(p.nombre)}</h2>
+          <span data-card-color>${text(p.color_caja || '')}${p.color_interior ? ` · Interior ${text(p.color_interior)}` : ''}</span>
+        </div>
       </div>
-    </section>
-
-    <section class="admin-form-section commercial-section" aria-labelledby="commercial-${attr(p.sku)}">
-      <div class="admin-section-heading"><div><span class="section-step">1</span><div><h3 id="commercial-${attr(p.sku)}">Stock y precios</h3><p>Ingresa los precios finales de venta.</p></div></div></div>
-      <div class="field-grid commercial-main-fields"><label>Stock disponible<input name="stock" type="number" min="0" value="${i.stock ?? 0}"></label><label>Costo base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${i.precio_base ?? ''}"></label></div>
-      <div class="sale-price-grid">
-        <div class="price-box wholesale"><label>Precio mayor (Bs)<input name="precio_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleMultiplier ?? ''}"></label></div>
-        <div class="price-box retail"><label>Precio menor (Bs)<input name="precio_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailMultiplier ?? ''}"></label></div>
+      <div class="admin-card-metrics" aria-label="Resumen comercial">
+        <span class="metric-tile stock-tile ${stock > 0 ? '' : 'out'}"><small>Stock</small><strong data-card-stock>${stock}</strong></span>
+        <span class="metric-tile cost-tile"><small>Costo</small><strong data-card-base>${formatAdminPrice(baseValue)}</strong></span>
+        <span class="metric-tile wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${formatAdminPrice(wholesaleValue)}</strong></span>
+        <span class="metric-tile retail-pill"><small>Minorista</small><strong data-card-retail>${formatAdminPrice(retailValue)}</strong></span>
       </div>
-      <p class="price-helper">Puedes escribir el precio final o el multiplicador. El otro valor se calculará automáticamente usando el costo base.</p>
-    </section>
+    </header>
+    <details>
+      <summary><span>Editar producto</span><small>Stock, precios, información y fotos</small></summary>
+      <form>
+        <section class="admin-form-section commercial-section" aria-labelledby="commercial-${attr(p.sku)}">
+          <div class="admin-section-heading"><div><span class="section-step">1</span><div><h3 id="commercial-${attr(p.sku)}">Stock y precios</h3><p>Modifica el precio o el multiplicador; el otro se calcula solo.</p></div></div></div>
+          <div class="field-grid commercial-main-fields">
+            <label>Stock disponible<input name="stock" type="number" min="0" value="${i.stock ?? 0}"></label>
+            <label>Costo base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}"></label>
+          </div>
+          <div class="sale-price-grid">
+            <div class="price-box wholesale"><div class="price-box-title"><strong>Venta mayorista</strong><span>Por cantidad</span></div><label>Precio final (Bs)<input name="precio_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_mayorista" type="number" min="0" step="0.0001" inputmode="decimal" value="${wholesaleMultiplier ?? ''}"></label></div>
+            <div class="price-box retail"><div class="price-box-title"><strong>Venta minorista</strong><span>Unidad</span></div><label>Precio final (Bs)<input name="precio_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_minorista" type="number" min="0" step="0.0001" inputmode="decimal" value="${retailMultiplier ?? ''}"></label></div>
+          </div>
+        </section>
 
-    <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
-      <div class="admin-section-heading"><div><span class="section-step">2</span><div><h3 id="content-${attr(p.sku)}">Información del producto</h3><p>Texto que verá el cliente en el catálogo.</p></div></div></div>
-      <label>Descripción<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
-      <label>Contenido y presentación<textarea name="detalle_distintivo" rows="4">${text(p.detalle_distintivo)}</textarea></label>
-    </section>
+        <section class="admin-form-section identity-section" aria-labelledby="identity-${attr(p.sku)}">
+          <div class="admin-section-heading"><div><span class="section-step">2</span><div><h3 id="identity-${attr(p.sku)}">Datos del producto</h3><p>El SKU está protegido porque conecta el catálogo con el inventario.</p></div></div></div>
+          <label>Nombre del producto<input name="nombre" value="${attr(p.nombre)}" required></label>
+          <div class="field-grid">
+            <label>SKU<input name="sku" class="sku-input locked-input" value="${attr(p.sku)}" readonly aria-readonly="true"><small>No se puede modificar.</small></label>
+            <label>Código de modelo<input name="codigo_modelo" value="${attr(p.codigo_modelo || '')}" required></label>
+            <label>Color de caja / presentación<input name="color_caja" value="${attr(p.color_caja || '')}" placeholder="Ej.: Azul"></label>
+            <label>Color interior<input name="color_interior" value="${attr(p.color_interior || '')}" placeholder="Ej.: Beige"><small>Déjalo vacío para no mostrar “Interior…” en el catálogo.</small></label>
+          </div>
+        </section>
 
-    <section class="admin-form-section photos-section" aria-labelledby="photos-${attr(p.sku)}">
-      <div class="admin-section-heading"><div><span class="section-step">3</span><div><h3 id="photos-${attr(p.sku)}">Fotografías</h3><p>Agrega hasta seis imágenes del producto.</p></div></div></div>
-      <label>Seleccionar fotografías<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure><a href="${url}" target="_blank"><img src="${url}" alt="Foto ${n+1}"></a><button type="button" data-remove-photo="${url}">Eliminar</button></figure>`).join('')}</div>
-    </section>
+        <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
+          <div class="admin-section-heading"><div><span class="section-step">3</span><div><h3 id="content-${attr(p.sku)}">Descripción</h3><p>Información que verá el cliente.</p></div></div></div>
+          <label>Descripción general<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
+          <label>Contenido de esta presentación<textarea name="detalle_distintivo" rows="4">${text(p.detalle_distintivo)}</textarea></label>
+        </section>
 
-    <p class="form-message" data-message></p><div class="admin-actions"><button class="button primary" type="submit">Guardar cambios</button><button class="button secondary" type="button" data-copy>Copiar descripción</button><button class="button whatsapp" type="button" data-share>Compartir</button></div>
-  </form></details></article>`;
+        <section class="admin-form-section photos-section" aria-labelledby="photos-${attr(p.sku)}">
+          <div class="admin-section-heading"><div><span class="section-step">4</span><div><h3 id="photos-${attr(p.sku)}">Fotografías</h3><p>Estas imágenes se mostrarán al elegir esta presentación.</p></div></div></div>
+          <label>Agregar fotografías<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+          <div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure><a href="${url}" target="_blank"><img src="${url}" alt="Foto ${n+1}"></a><button type="button" data-remove-photo="${url}">Eliminar</button></figure>`).join('')}</div>
+        </section>
+
+        <p class="form-message" data-message></p>
+        <div class="admin-actions sticky-save-actions"><button class="button primary" type="submit">Guardar cambios</button><button class="button secondary" type="button" data-copy>Copiar descripción</button><button class="button whatsapp" type="button" data-share>Compartir</button></div>
+      </form>
+    </details>
+  </article>`;
 }
-
 function bindCard(card) {
   const form = card.querySelector('form');
 
   const updateHeader = () => {
     const name = form.nombre.value.trim() || 'Producto sin nombre';
-    const sku = form.sku.value.trim().toUpperCase();
+    const sku = card.dataset.sku;
     const color = form.color_caja.value.trim();
+    const interior = form.color_interior.value.trim();
     card.querySelector('[data-card-name]').textContent = name;
     card.querySelector('[data-card-sku]').textContent = sku;
-    card.querySelector('[data-card-color]').textContent = color;
-    card.dataset.search = normalizeSearch([sku, name, color, form.descripcion.value, form.detalle_distintivo.value].filter(Boolean).join(' '));
+    card.querySelector('[data-card-color]').textContent = [color, interior ? `Interior ${interior}` : ''].filter(Boolean).join(' · ');
+    card.dataset.search = normalizeSearch([sku, form.codigo_modelo.value, name, color, interior, form.descripcion.value, form.detalle_distintivo.value].filter(Boolean).join(' '));
     applyProductSearch();
   };
 
@@ -141,6 +167,7 @@ function bindCard(card) {
   };
 
   const updatePriceBadges = () => {
+    card.querySelector('[data-card-base]').textContent = formatAdminPrice(form.precio_base.value);
     card.querySelector('[data-card-wholesale]').textContent = formatAdminPrice(form.precio_mayorista.value);
     card.querySelector('[data-card-retail]').textContent = formatAdminPrice(form.precio_minorista.value);
   };
@@ -152,7 +179,7 @@ function bindCard(card) {
 
   const updateStock = () => {
     const stock = Math.max(0, Number(form.stock.value) || 0);
-    const badge = card.querySelector('.admin-card-metrics .availability');
+    const badge = card.querySelector('.admin-card-metrics .stock-tile');
     card.querySelector('[data-card-stock]').textContent = stock;
     badge.classList.toggle('out', stock <= 0);
   };
@@ -163,24 +190,23 @@ function bindCard(card) {
   form.multiplicador_mayorista.addEventListener('input', () => updatePriceFromMultiplier('mayorista'));
   form.multiplicador_minorista.addEventListener('input', () => updatePriceFromMultiplier('minorista'));
   form.stock.addEventListener('input', updateStock);
-  ['nombre','sku','color_caja','descripcion','detalle_distintivo'].forEach(name => form[name].addEventListener('input', updateHeader));
-  form.sku.addEventListener('blur', () => { form.sku.value = form.sku.value.trim().toUpperCase(); updateHeader(); });
+  ['nombre','codigo_modelo','color_caja','color_interior','descripcion','detalle_distintivo'].forEach(name => form[name].addEventListener('input', updateHeader));
   form.addEventListener('submit', e => save(e, card.dataset.sku));
-  form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, form.sku.value.trim().toUpperCase())));
-  form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, form.sku.value.trim().toUpperCase()), card.dataset.firstImage, form.nombre.value));
+  form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
+  form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
   form.querySelectorAll('[data-remove-photo]').forEach(b => b.addEventListener('click', () => removePhoto(card.dataset.sku, b.dataset.removePhoto)));
 }
 
 async function save(event, sku) {
   event.preventDefault(); const form = event.currentTarget; const message = form.querySelector('[data-message]');
   message.textContent = 'Guardando…';
-  const newSku = form.sku.value.trim().toUpperCase();
-  if (!newSku) { message.textContent = 'El código del producto es obligatorio.'; return; }
+  const fixedSku = sku;
   let images = [...form.querySelectorAll('.photo-list img')].map(i => i.src);
-  try { images = images.concat(await uploadPhotos(newSku, [...form.photos.files], images.length)); }
+  try { images = images.concat(await uploadPhotos(fixedSku, [...form.photos.files], images.length)); }
   catch (e) { message.textContent = e.message; return; }
-  const publicData = { sku:newSku, nombre: form.nombre.value.trim(), color_caja:form.color_caja.value.trim(), descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), imagenes: images };
-  const privateData = { sku:newSku, stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value) };
+  const retailPrice = nullableNumber(form.precio_minorista.value);
+  const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), precio_minorista: retailPrice, imagenes: images, actualizado_en:new Date().toISOString() };
+  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), precio_mayorista: nullableNumber(form.precio_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), precio_minorista: retailPrice, actualizado_en:new Date().toISOString() };
   const [{ error: e1 }, { error: e2 }] = await Promise.all([db.from('productos_publicos').update(publicData).eq('sku', sku), db.from('inventario_privado').update(privateData).eq('sku', sku)]);
   if (e1 || e2) message.textContent = `No se guardó: ${(e1 || e2).message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }
 }

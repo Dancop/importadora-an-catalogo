@@ -20,12 +20,12 @@ function applyBrand() {
   document.title = `${companyName} | Catálogo`;
 }
 
-const money = value => value == null ? 'Consultar precio' : `Bs ${Number(value).toLocaleString('es-BO')}`;
+const money = value => value == null ? 'Consultar precio' : `Bs ${Number(value).toLocaleString('es-BO', { maximumFractionDigits: 2 })}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 
 function groupProducts(rows) {
   const map = new Map();
-  rows.forEach(row => {
+  rows.filter(row => row.disponible !== false).forEach(row => {
     if (!map.has(row.codigo_modelo)) map.set(row.codigo_modelo, { ...row, variants: [] });
     map.get(row.codigo_modelo).variants.push(row);
   });
@@ -46,7 +46,7 @@ function card(product) {
   return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}">
     <div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span></div>
     <div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(product.nombre)}</h3>
-    <p class="summary">${escapeHtml(product.descripcion)}</p><div class="card-bottom"><strong>${price}</strong><button class="text-button">Ver detalles →</button></div></div>
+    <p class="summary">${escapeHtml(product.descripcion)}</p><div class="card-bottom"><strong>${price}</strong><button class="text-button" type="button">Ver detalles →</button></div></div>
   </article>`;
 }
 
@@ -56,28 +56,104 @@ function render(filter = 'Todos') {
   grid.querySelectorAll('.product-card').forEach(cardEl => cardEl.addEventListener('click', () => openProduct(cardEl.dataset.code)));
 }
 
+function variantImages(variant, product) {
+  const own = (variant.imagenes || []).filter(Boolean);
+  if (own.length) return own;
+  return product.variants.flatMap(v => v.imagenes || []).filter(Boolean);
+}
+
+function galleryMarkup(images, productName) {
+  const list = images.length ? images : [brandLogo];
+  return `<div class="gallery-stage">
+      <button class="gallery-arrow gallery-prev" type="button" aria-label="Fotografía anterior">‹</button>
+      <div class="gallery-track">${list.map((url, index) => `<figure class="gallery-slide${index === 0 ? ' active' : ''}" data-gallery-index="${index}"><img src="${escapeHtml(url)}" alt="${escapeHtml(productName)} - fotografía ${index + 1}"></figure>`).join('')}</div>
+      <button class="gallery-arrow gallery-next" type="button" aria-label="Fotografía siguiente">›</button>
+    </div>
+    <div class="gallery-thumbs" aria-label="Seleccionar fotografía">${list.map((url, index) => `<button type="button" class="gallery-thumb${index === 0 ? ' active' : ''}" data-gallery-go="${index}" aria-label="Ver fotografía ${index + 1}"><img src="${escapeHtml(url)}" alt=""></button>`).join('')}</div>
+    <p class="gallery-counter"><span data-gallery-current>1</span> de <span data-gallery-total>${list.length}</span></p>`;
+}
+
+function variantMarkup(v, index, selectedIndex) {
+  const title = v.color_caja || 'Presentación';
+  return `<button type="button" class="variant-card${index === selectedIndex ? ' active' : ''}" data-variant-index="${index}">
+    <span class="variant-card-top"><strong>${escapeHtml(title)}</strong>${v.color_interior ? `<small>Interior ${escapeHtml(v.color_interior)}</small>` : ''}</span>
+    <span class="variant-description">${escapeHtml(v.detalle_distintivo || '')}</span>
+    <span class="variant-footer"><span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span><strong>${showPrices ? money(v.precio_minorista) : 'Consultar por WhatsApp'}</strong></span>
+  </button>`;
+}
+
 function openProduct(code) {
   const product = groups.find(p => p.codigo_modelo === code);
-  const images = product.variants.flatMap(v => v.imagenes || []);
-  content.innerHTML = `<div class="dialog-gallery">${images.length ? images.map(url => `<img src="${escapeHtml(url)}" alt="${escapeHtml(product.nombre)}">`).join('') : cover(product)}</div>
-    <div class="dialog-details"><p class="eyebrow">${escapeHtml(product.categoria)}</p><h2>${escapeHtml(product.nombre)}</h2><p>${escapeHtml(product.descripcion)}</p>
-    <h3>Presentaciones</h3><div class="variants">${product.variants.map(v => `<div><div><strong>${escapeHtml(v.color_caja || 'Presentación')}</strong>${v.color_interior ? `<span>Interior ${escapeHtml(v.color_interior)}</span>` : ''}</div><p>${escapeHtml(v.detalle_distintivo)}</p><footer><span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span><strong>${showPrices ? money(v.precio_minorista) : 'Consultar por WhatsApp'}</strong></footer></div>`).join('')}</div>
-    <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" href="https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`Hola, quisiera consultar por ${product.nombre} (${product.codigo_modelo}).`)}">Consultar por WhatsApp</a><button id="share-product" class="button secondary">Compartir</button></div></div>`;
-  content.querySelector('#share-product').addEventListener('click', () => shareProduct(product, images[0]));
+  if (!product) return;
+  let selectedIndex = Math.max(0, product.variants.findIndex(v => (v.imagenes || []).length));
+  let galleryIndex = 0;
+
+  const renderDialog = () => {
+    const selected = product.variants[selectedIndex];
+    const images = variantImages(selected, product);
+    content.innerHTML = `<div class="dialog-gallery" data-dialog-gallery>${galleryMarkup(images, product.nombre)}</div>
+      <div class="dialog-details">
+        <p class="eyebrow">${escapeHtml(product.categoria)}</p>
+        <h2>${escapeHtml(product.nombre)}</h2>
+        <p>${escapeHtml(product.descripcion)}</p>
+        <div class="presentation-heading"><div><h3>Presentaciones</h3><p>Selecciona una opción para ver sus fotografías y detalles.</p></div></div>
+        <div class="variants">${product.variants.map((v, index) => variantMarkup(v, index, selectedIndex)).join('')}</div>
+        <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" data-variant-whatsapp>Consultar por WhatsApp</a><button id="share-product" class="button secondary" type="button">Compartir</button></div>
+      </div>`;
+
+    const setGallery = next => {
+      const slides = [...content.querySelectorAll('.gallery-slide')];
+      const thumbs = [...content.querySelectorAll('.gallery-thumb')];
+      if (!slides.length) return;
+      galleryIndex = (next + slides.length) % slides.length;
+      slides.forEach((slide, i) => slide.classList.toggle('active', i === galleryIndex));
+      thumbs.forEach((thumb, i) => thumb.classList.toggle('active', i === galleryIndex));
+      content.querySelector('[data-gallery-current]').textContent = galleryIndex + 1;
+      slides[galleryIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    };
+
+    content.querySelector('.gallery-prev').addEventListener('click', () => setGallery(galleryIndex - 1));
+    content.querySelector('.gallery-next').addEventListener('click', () => setGallery(galleryIndex + 1));
+    content.querySelectorAll('[data-gallery-go]').forEach(button => button.addEventListener('click', () => setGallery(Number(button.dataset.galleryGo))));
+    const track = content.querySelector('.gallery-track');
+    track.addEventListener('scroll', () => {
+      const width = track.clientWidth || 1;
+      const next = Math.round(track.scrollLeft / width);
+      if (next !== galleryIndex) {
+        galleryIndex = Math.max(0, Math.min(next, images.length - 1));
+        content.querySelectorAll('.gallery-thumb').forEach((thumb, i) => thumb.classList.toggle('active', i === galleryIndex));
+        content.querySelector('[data-gallery-current]').textContent = galleryIndex + 1;
+      }
+    }, { passive: true });
+
+    content.querySelectorAll('[data-variant-index]').forEach(button => button.addEventListener('click', () => {
+      selectedIndex = Number(button.dataset.variantIndex);
+      galleryIndex = 0;
+      renderDialog();
+    }));
+
+    const selectedLabel = selected.color_caja || 'Presentación';
+    const whatsappText = `Hola, quisiera consultar por ${product.nombre}, presentación ${selectedLabel} (${selected.sku}).`;
+    content.querySelector('[data-variant-whatsapp]').href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(whatsappText)}`;
+    content.querySelector('#share-product').addEventListener('click', () => shareProduct(product, selected, images[galleryIndex] || images[0]));
+  };
+
+  renderDialog();
   dialog.showModal();
 }
 
-async function shareProduct(product, imageUrl) {
-  const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
-  const priceText = showPrices && prices.length
-    ? (Math.min(...prices) === Math.max(...prices) ? money(prices[0]) : `Desde ${money(Math.min(...prices))}`)
-    : 'Consultar por WhatsApp';
-  const available = product.variants.some(v => v.disponible) ? 'Disponible' : 'Agotado';
-  const presentations = product.variants.map(v => `• Caja ${v.color_caja}${v.color_interior ? `, interior ${v.color_interior}` : ''}`).join('\n');
+async function shareProduct(product, variant, imageUrl) {
+  const priceText = showPrices && variant.precio_minorista != null ? money(variant.precio_minorista) : 'Consultar por WhatsApp';
+  const available = variant.disponible ? 'Disponible' : 'Agotado';
+  const presentation = [variant.color_caja ? `Caja ${variant.color_caja}` : '', variant.color_interior ? `interior ${variant.color_interior}` : ''].filter(Boolean).join(', ');
   const text = applyTemplate(shareTemplate, {
-    nombre: product.nombre, descripcion: product.descripcion,
-    detalle: `Presentaciones:\n${presentations}`, precio: priceText,
-    disponibilidad: available, codigo: product.codigo_modelo, enlace: location.href
+    nombre: product.nombre,
+    descripcion: product.descripcion,
+    detalle: [presentation, variant.detalle_distintivo].filter(Boolean).join('\n'),
+    precio: priceText,
+    disponibilidad: available,
+    codigo: variant.sku || product.codigo_modelo,
+    enlace: location.href
   });
   if (navigator.share && imageUrl) {
     try {

@@ -114,3 +114,19 @@
   .metric-tile strong{font-size:.84rem}
   .commercial-main-fields{grid-template-columns:1fr 1fr}
 }
+
+/* ===== Costos internos y costo operativo ===== */
+.stock-field{max-width:260px}
+.cost-calculation-box{display:grid;gap:13px;border:1px solid #d7dee2;border-radius:13px;padding:15px;background:#f3f5f6}
+.cost-fields{align-items:start}
+.cost-fields label>small{font-size:.72rem;font-weight:400;color:var(--muted)}
+.own-cost-result{display:grid;grid-template-columns:1fr auto;align-items:center;gap:3px 14px;border:1px solid #cbd6db;border-radius:11px;padding:12px 14px;background:#fff}
+.own-cost-result>span{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.055em;color:#45545e}
+.own-cost-result>strong{grid-row:1/3;grid-column:2;font-size:1.2rem;color:var(--navy)}
+.own-cost-result>small{font-size:.72rem;color:var(--muted)}
+
+@media(max-width:560px){
+  .stock-field{max-width:none}
+  .cost-fields{grid-template-columns:1fr}
+  .own-cost-result>strong{font-size:1.08rem}
+}

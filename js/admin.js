@@ -69,10 +69,12 @@ function editor(p, i) {
   const thumbnail = firstImage || '../assets/logo.png';
   const stock = Number(i.stock || 0);
   const baseValue = i.precio_base ?? '';
+  const costFactor = i.factor_costo ?? 2.6;
+  const ownCostValue = i.costo_propio ?? calculateOwnCost(baseValue, costFactor);
   const wholesaleValue = i.precio_mayorista ?? '';
   const retailValue = i.precio_minorista ?? '';
-  const wholesaleMultiplier = calculateMultiplier(baseValue, wholesaleValue, i.multiplicador_mayorista);
-  const retailMultiplier = calculateMultiplier(baseValue, retailValue, i.multiplicador_minorista);
+  const wholesaleMultiplier = calculateMultiplier(ownCostValue, wholesaleValue, i.multiplicador_mayorista);
+  const retailMultiplier = calculateMultiplier(ownCostValue, retailValue, i.multiplicador_minorista);
   const searchText = normalizeSearch([p.sku, p.codigo_modelo, p.nombre, p.color_caja, p.color_interior, p.descripcion, p.detalle_distintivo].filter(Boolean).join(' '));
   return `<article class="admin-card" data-sku="${attr(p.sku)}" data-first-image="${attr(firstImage)}" data-search="${attr(searchText)}">
     <header class="admin-card-summary">
@@ -86,7 +88,7 @@ function editor(p, i) {
       </div>
       <div class="admin-card-metrics" aria-label="Resumen comercial">
         <span class="metric-tile stock-tile ${stock > 0 ? '' : 'out'}"><small>Stock</small><strong data-card-stock>${stock}</strong></span>
-        <span class="metric-tile cost-tile"><small>Costo</small><strong data-card-base>${formatAdminPrice(baseValue)}</strong></span>
+        <span class="metric-tile cost-tile"><small>Mi costo</small><strong data-card-cost>${formatAdminPrice(ownCostValue)}</strong></span>
         <span class="metric-tile wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${formatAdminPrice(wholesaleValue)}</strong></span>
         <span class="metric-tile retail-pill"><small>Minorista</small><strong data-card-retail>${formatAdminPrice(retailValue)}</strong></span>
       </div>
@@ -94,11 +96,17 @@ function editor(p, i) {
     <details>
       <summary><span>Editar producto</span><small>Stock, precios, información y fotos</small></summary>
       <form>
+        <input name="costo_propio" type="hidden" value="${ownCostValue}">
         <section class="admin-form-section commercial-section" aria-labelledby="commercial-${attr(p.sku)}">
-          <div class="admin-section-heading"><div><span class="section-step">1</span><div><h3 id="commercial-${attr(p.sku)}">Stock y precios</h3><p>Modifica el precio o el multiplicador; el otro se calcula solo.</p></div></div></div>
-          <div class="field-grid commercial-main-fields">
-            <label>Stock disponible<input name="stock" type="number" min="0" value="${i.stock ?? 0}"></label>
-            <label>Costo base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}"></label>
+          <div class="admin-section-heading"><div><span class="section-step">1</span><div><h3 id="commercial-${attr(p.sku)}">Stock, costos y precios</h3><p>Primero se calcula tu costo; luego puedes definir cada precio o su multiplicador.</p></div></div></div>
+          <label class="stock-field">Stock disponible<input name="stock" type="number" min="0" value="${i.stock ?? 0}"></label>
+          <div class="cost-calculation-box">
+            <div class="price-box-title"><strong>Cálculo de mi costo</strong><span>Información interna</span></div>
+            <div class="field-grid cost-fields">
+              <label>Precio base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}"><small>Lo que costó originalmente el producto.</small></label>
+              <label>Factor de costo<input name="factor_costo" type="number" min="0" step="0.01" inputmode="decimal" value="${costFactor}"><small>Actualmente 2,60; puedes modificarlo cuando corresponda.</small></label>
+            </div>
+            <div class="own-cost-result" aria-live="polite"><span>Mi costo</span><strong data-own-cost>${formatAdminPrice(ownCostValue)}</strong><small>Precio base × factor de costo</small></div>
           </div>
           <div class="sale-price-grid">
             <div class="price-box wholesale"><div class="price-box-title"><strong>Venta mayorista</strong><span>Por cantidad</span></div><label>Precio final (Bs)<input name="precio_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_mayorista" type="number" min="0" step="0.0001" inputmode="decimal" value="${wholesaleMultiplier ?? ''}"></label></div>
@@ -151,7 +159,7 @@ function bindCard(card) {
   };
 
   const updatePriceFromMultiplier = type => {
-    const base = Number(form.precio_base.value);
+    const base = Number(form.costo_propio.value);
     const multiplier = Number(form[`multiplicador_${type}`].value);
     const priceInput = form[`precio_${type}`];
     priceInput.value = base > 0 && multiplier >= 0 ? roundPrice(base * multiplier) : '';
@@ -159,7 +167,7 @@ function bindCard(card) {
   };
 
   const updateMultiplierFromPrice = type => {
-    const base = Number(form.precio_base.value);
+    const base = Number(form.costo_propio.value);
     const price = Number(form[`precio_${type}`].value);
     const multiplierInput = form[`multiplicador_${type}`];
     multiplierInput.value = base > 0 && price >= 0 ? roundMultiplier(price / base) : '';
@@ -167,7 +175,7 @@ function bindCard(card) {
   };
 
   const updatePriceBadges = () => {
-    card.querySelector('[data-card-base]').textContent = formatAdminPrice(form.precio_base.value);
+    card.querySelector('[data-card-cost]').textContent = formatAdminPrice(form.costo_propio.value);
     card.querySelector('[data-card-wholesale]').textContent = formatAdminPrice(form.precio_mayorista.value);
     card.querySelector('[data-card-retail]').textContent = formatAdminPrice(form.precio_minorista.value);
   };
@@ -177,6 +185,14 @@ function bindCard(card) {
     updatePriceFromMultiplier('minorista');
   };
 
+  const updateOwnCost = () => {
+    const ownCost = calculateOwnCost(form.precio_base.value, form.factor_costo.value);
+    form.costo_propio.value = ownCost === '' ? '' : ownCost;
+    card.querySelector('[data-own-cost]').textContent = formatAdminPrice(ownCost);
+    card.querySelector('[data-card-cost]').textContent = formatAdminPrice(ownCost);
+    recalculatePricesFromMultipliers();
+  };
+
   const updateStock = () => {
     const stock = Math.max(0, Number(form.stock.value) || 0);
     const badge = card.querySelector('.admin-card-metrics .stock-tile');
@@ -184,7 +200,8 @@ function bindCard(card) {
     badge.classList.toggle('out', stock <= 0);
   };
 
-  form.precio_base.addEventListener('input', recalculatePricesFromMultipliers);
+  form.precio_base.addEventListener('input', updateOwnCost);
+  form.factor_costo.addEventListener('input', updateOwnCost);
   form.precio_mayorista.addEventListener('input', () => updateMultiplierFromPrice('mayorista'));
   form.precio_minorista.addEventListener('input', () => updateMultiplierFromPrice('minorista'));
   form.multiplicador_mayorista.addEventListener('input', () => updatePriceFromMultiplier('mayorista'));
@@ -206,7 +223,7 @@ async function save(event, sku) {
   catch (e) { message.textContent = e.message; return; }
   const retailPrice = nullableNumber(form.precio_minorista.value);
   const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), precio_minorista: retailPrice, imagenes: images, actualizado_en:new Date().toISOString() };
-  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), precio_mayorista: nullableNumber(form.precio_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), precio_minorista: retailPrice, actualizado_en:new Date().toISOString() };
+  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), precio_mayorista: nullableNumber(form.precio_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), precio_minorista: retailPrice, actualizado_en:new Date().toISOString() };
   const [{ error: e1 }, { error: e2 }] = await Promise.all([db.from('productos_publicos').update(publicData).eq('sku', sku), db.from('inventario_privado').update(privateData).eq('sku', sku)]);
   if (e1 || e2) message.textContent = `No se guardó: ${(e1 || e2).message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }
 }
@@ -345,6 +362,12 @@ async function share(value, imageUrl, productName) {
 }
 function attr(v) { return String(v ?? '').replace(/[&"]/g, c => c === '&' ? '&amp;' : '&quot;'); }
 function text(v) { return String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function calculateOwnCost(baseValue, factorValue) {
+  const base = Number(baseValue);
+  const factor = Number(factorValue);
+  return base >= 0 && factor >= 0 && Number.isFinite(base) && Number.isFinite(factor) ? roundPrice(base * factor) : '';
+}
 
 function calculateMultiplier(baseValue, priceValue, fallbackValue = null) {
   const base = Number(baseValue);

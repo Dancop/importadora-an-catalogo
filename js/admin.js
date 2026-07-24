@@ -103,7 +103,7 @@ function editor(p, i) {
           <div class="cost-calculation-box">
             <div class="price-box-title"><strong>Cálculo de mi costo</strong><span>Información interna</span></div>
             <div class="field-grid cost-fields">
-              <label>Precio base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}"><small>Lo que costó originalmente el producto.</small></label>
+              <label>Precio base (Bs)<span class="field-status editable-status">Editable</span><input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}" autocomplete="off"><small>Lo que costó originalmente el producto a tu proveedor.</small></label>
               <label>Factor de costo<input name="factor_costo" type="number" min="0" step="0.01" inputmode="decimal" value="${costFactor}"><small>Actualmente 2,60; puedes modificarlo cuando corresponda.</small></label>
             </div>
             <div class="own-cost-result" aria-live="polite"><span>Mi costo</span><strong data-own-cost>${formatAdminPrice(ownCostValue)}</strong><small>Precio base × factor de costo</small></div>
@@ -114,28 +114,39 @@ function editor(p, i) {
           </div>
         </section>
 
-        <section class="admin-form-section identity-section" aria-labelledby="identity-${attr(p.sku)}">
-          <div class="admin-section-heading"><div><span class="section-step">2</span><div><h3 id="identity-${attr(p.sku)}">Datos del producto</h3><p>El SKU está protegido porque conecta el catálogo con el inventario.</p></div></div></div>
-          <label>Nombre del producto<input name="nombre" value="${attr(p.nombre)}" required></label>
-          <div class="field-grid">
-            <label>SKU<input name="sku" class="sku-input locked-input" value="${attr(p.sku)}" readonly aria-readonly="true"><small>No se puede modificar.</small></label>
-            <label>Código de modelo<input name="codigo_modelo" value="${attr(p.codigo_modelo || '')}" required></label>
-            <label>Color de caja / presentación<input name="color_caja" value="${attr(p.color_caja || '')}" placeholder="Ej.: Azul"></label>
-            <label>Color interior<input name="color_interior" value="${attr(p.color_interior || '')}" placeholder="Ej.: Beige"><small>Déjalo vacío para no mostrar “Interior…” en el catálogo.</small></label>
-          </div>
-        </section>
+        <div class="admin-secondary-grid">
+          <details class="form-accordion">
+            <summary><span><b>2</b> Datos del producto</span><small>Nombre, modelo y colores</small></summary>
+            <section class="admin-form-section identity-section" aria-labelledby="identity-${attr(p.sku)}">
+              <div class="admin-section-heading"><div><div><h3 id="identity-${attr(p.sku)}">Información del producto</h3><p>Abre esta sección solo cuando necesites cambiar los datos visibles.</p></div></div></div>
+              <label>Nombre del producto<input name="nombre" value="${attr(p.nombre)}" required></label>
+              <div class="field-grid">
+                <label>SKU<input name="sku" class="sku-input locked-input" value="${attr(p.sku)}" readonly aria-readonly="true"><small>Identificador protegido; no se modifica.</small></label>
+                <label>Código de modelo<input name="codigo_modelo" value="${attr(p.codigo_modelo || '')}" required></label>
+                <label>Color de caja / presentación<input name="color_caja" value="${attr(p.color_caja || '')}" placeholder="Ej.: Azul"></label>
+                <label>Color interior<input name="color_interior" value="${attr(p.color_interior || '')}" placeholder="Ej.: Beige"><small>Déjalo vacío para ocultarlo en el catálogo.</small></label>
+              </div>
+            </section>
+          </details>
 
-        <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
-          <div class="admin-section-heading"><div><span class="section-step">3</span><div><h3 id="content-${attr(p.sku)}">Descripción</h3><p>Información que verá el cliente.</p></div></div></div>
-          <label>Descripción general<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
-          <label>Contenido de esta presentación<textarea name="detalle_distintivo" rows="4">${text(p.detalle_distintivo)}</textarea></label>
-        </section>
+          <details class="form-accordion">
+            <summary><span><b>3</b> Descripción</span><small>Texto que verá el cliente</small></summary>
+            <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
+              <div class="admin-section-heading"><div><div><h3 id="content-${attr(p.sku)}">Contenido del catálogo</h3><p>Edita únicamente cuando cambie la presentación o su contenido.</p></div></div></div>
+              <label>Descripción general<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
+              <label>Contenido de esta presentación<textarea name="detalle_distintivo" rows="4">${text(p.detalle_distintivo)}</textarea></label>
+            </section>
+          </details>
 
-        <section class="admin-form-section photos-section" aria-labelledby="photos-${attr(p.sku)}">
-          <div class="admin-section-heading"><div><span class="section-step">4</span><div><h3 id="photos-${attr(p.sku)}">Fotografías</h3><p>Estas imágenes se mostrarán al elegir esta presentación.</p></div></div></div>
-          <label>Agregar fotografías<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
-          <div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure><a href="${url}" target="_blank"><img src="${url}" alt="Foto ${n+1}"></a><button type="button" data-remove-photo="${url}">Eliminar</button></figure>`).join('')}</div>
-        </section>
+          <details class="form-accordion">
+            <summary><span><b>4</b> Fotografías</span><small>${(p.imagenes || []).length} imagen(es)</small></summary>
+            <section class="admin-form-section photos-section" aria-labelledby="photos-${attr(p.sku)}">
+              <div class="admin-section-heading"><div><div><h3 id="photos-${attr(p.sku)}">Imágenes de la presentación</h3><p>Estas fotografías cambian cuando el cliente selecciona esta variante.</p></div></div></div>
+              <label>Agregar fotografías<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+              <div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure><a href="${url}" target="_blank"><img src="${url}" alt="Foto ${n+1}"></a><button type="button" data-remove-photo="${url}">Eliminar</button></figure>`).join('')}</div>
+            </section>
+          </details>
+        </div>
 
         <p class="form-message" data-message></p>
         <div class="admin-actions sticky-save-actions"><button class="button primary" type="submit">Guardar cambios</button><button class="button secondary" type="button" data-copy>Copiar descripción</button><button class="button whatsapp" type="button" data-share>Compartir</button></div>

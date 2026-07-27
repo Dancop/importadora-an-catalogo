@@ -13,6 +13,7 @@ const noSearchResults = document.querySelector('#no-search-results');
 const DEFAULT_TEMPLATE = `*{nombre}*\n\n{descripcion}\n\n*Incluye y presentación:*\n{detalle}\n\n*Precio:* {precio}\n*Disponibilidad:* {disponibilidad}\n*Código:* {codigo}\n\n{enlace}`;
 let shareTemplate = DEFAULT_TEMPLATE;
 let catalogConfig = { nombre_empresa:'Importadora A&N', mostrar_precios:false, mostrar_costo_admin:false, logo_url:null };
+let profitabilityRows = [];
 
 document.querySelector('#login-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -29,7 +30,8 @@ document.querySelectorAll('[data-admin-panel]').forEach(button => button.addEven
   document.querySelector('#products-panel').hidden = target !== 'products-panel';
   document.querySelector('#whatsapp-panel').hidden = target !== 'whatsapp-panel';
   document.querySelector('#catalog-settings-panel').hidden = target !== 'catalog-settings-panel';
-  document.querySelector('#admin-title').textContent = target === 'products-panel' ? 'Productos' : target === 'catalog-settings-panel' ? 'Catálogo' : 'WhatsApp';
+  document.querySelector('#profitability-panel').hidden = target !== 'profitability-panel';
+  document.querySelector('#admin-title').textContent = target === 'products-panel' ? 'Productos' : target === 'profitability-panel' ? 'Rentabilidad' : target === 'catalog-settings-panel' ? 'Catálogo' : 'WhatsApp';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }));
 
@@ -61,6 +63,8 @@ async function loadProducts() {
   document.querySelector('#share-template').value = shareTemplate;
   updateTemplatePreview();
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
+  profitabilityRows = products.map(p => buildProfitabilityRow(p, privateMap.get(p.sku) || {}));
+  renderProfitability();
   list.innerHTML = products.map(p => editor(p, privateMap.get(p.sku) || {})).join(''); status.hidden = true;
   list.querySelectorAll('.admin-card').forEach(bindCard);
   applyProductSearch();
@@ -108,7 +112,7 @@ function editor(p, i) {
           <div class="cost-calculation-box">
             <div class="price-box-title"><strong>Cálculo de mi costo</strong><span>Información interna</span></div>
             <div class="field-grid cost-fields">
-              <label>Precio base (Bs)<span class="field-status editable-status">Editable</span><input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}" autocomplete="off"><small>Lo que costó originalmente el producto a tu proveedor.</small></label>
+              <label>Precio base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}" autocomplete="off"><small>Lo que costó originalmente el producto a tu proveedor.</small></label>
               <label>Factor de costo<input name="factor_costo" type="number" min="0" step="0.01" inputmode="decimal" value="${costFactor}"><small>Puedes modificarlo cuando corresponda.</small></label>
             </div>
             <div class="own-cost-result" aria-live="polite"><span>Proveedor recibe</span><strong data-own-cost>${formatAdminPrice(ownCostValue)}</strong><small>Precio base × factor de costo</small><em>Ganancia del proveedor: <b data-provider-profit>${formatAdminPrice(providerProfit)}</b></em></div>
@@ -455,6 +459,92 @@ function formatAdminPrice(value) {
   if (amount < 0) return `-Bs ${Math.abs(Math.round(amount))}`;
   return `Bs ${Math.round(amount)}`;
 }
+
+
+function buildProfitabilityRow(product, inventory) {
+  const stock = Math.max(0, Number(inventory.stock) || 0);
+  const base = Number(inventory.precio_base) || 0;
+  const factor = Number(inventory.factor_costo ?? 2.6) || 0;
+  const providerReceives = Number(inventory.costo_propio) || calculateOwnCost(base, factor) || 0;
+  const wholesalePrice = Number(inventory.precio_mayorista) || 0;
+  const retailPrice = Number(inventory.precio_minorista) || 0;
+  const providerProfit = calculateProfit(providerReceives, base) || 0;
+  const wholesaleProfit = calculateProfit(wholesalePrice, providerReceives) || 0;
+  const retailProfit = calculateProfit(retailPrice, providerReceives) || 0;
+  return {
+    sku: product.sku,
+    name: product.nombre || 'Producto sin nombre',
+    color: [product.color_caja, product.color_interior ? `Interior ${product.color_interior}` : ''].filter(Boolean).join(' · '),
+    image: (product.imagenes || [])[0] || '../assets/logo.png',
+    stock,
+    providerReceives,
+    providerProfit,
+    wholesalePrice,
+    wholesaleProfit,
+    retailPrice,
+    retailProfit,
+    search: normalizeSearch([product.sku, product.codigo_modelo, product.nombre, product.color_caja, product.color_interior].filter(Boolean).join(' '))
+  };
+}
+
+function renderProfitability() {
+  const summary = document.querySelector('#profitability-summary');
+  const detail = document.querySelector('#profitability-detail');
+  if (!summary || !detail) return;
+  const totals = profitabilityRows.reduce((acc, row) => {
+    acc.units += row.stock;
+    acc.providerReceives += row.providerReceives * row.stock;
+    acc.providerProfit += row.providerProfit * row.stock;
+    acc.wholesaleProfit += row.wholesaleProfit * row.stock;
+    acc.retailProfit += row.retailProfit * row.stock;
+    return acc;
+  }, { units:0, providerReceives:0, providerProfit:0, wholesaleProfit:0, retailProfit:0 });
+  summary.innerHTML = `
+    <article class="profit-summary-card"><small>Unidades disponibles</small><strong>${totals.units}</strong><span>Stock total registrado</span></article>
+    <article class="profit-summary-card internal"><small>Proveedor recibe</small><strong>${formatAdminPrice(totals.providerReceives)}</strong><span>Total según stock</span></article>
+    <article class="profit-summary-card"><small>Ganancia del proveedor</small><strong>${formatAdminPrice(totals.providerProfit)}</strong><span>Potencial según stock</span></article>
+    <article class="profit-summary-card wholesale"><small>Tu ganancia mayorista</small><strong>${formatAdminPrice(totals.wholesaleProfit)}</strong><span>Potencial según stock</span></article>
+    <article class="profit-summary-card retail"><small>Tu ganancia minorista</small><strong>${formatAdminPrice(totals.retailProfit)}</strong><span>Potencial según stock</span></article>`;
+  applyProfitabilitySearch();
+}
+
+function profitabilityRowMarkup(row) {
+  return `<article class="profitability-row" data-profit-search="${attr(row.search)}">
+    <div class="profit-product-cell" data-label="Producto">
+      <img src="${attr(row.image)}" alt="Miniatura de ${attr(row.name)}">
+      <div><strong>${text(row.name)}</strong><small>${text(row.sku)}</small><span>${text(row.color)}</span></div>
+    </div>
+    <div class="profit-cell stock" data-label="Stock"><strong>${row.stock}</strong><small>unidades</small></div>
+    <div class="profit-cell" data-label="Proveedor recibe"><strong>${formatAdminPrice(row.providerReceives)}</strong><small>${formatAdminPrice(row.providerReceives * row.stock)} total</small></div>
+    <div class="profit-cell" data-label="Gana proveedor"><strong>${formatAdminPrice(row.providerProfit)}</strong><small>${formatAdminPrice(row.providerProfit * row.stock)} total</small></div>
+    <div class="profit-cell wholesale" data-label="Mayorista"><strong>${formatAdminPrice(row.wholesalePrice)}</strong><small>Ganas ${formatAdminPrice(row.wholesaleProfit)}</small><em>${formatAdminPrice(row.wholesaleProfit * row.stock)} total</em></div>
+    <div class="profit-cell retail" data-label="Minorista"><strong>${formatAdminPrice(row.retailPrice)}</strong><small>Ganas ${formatAdminPrice(row.retailProfit)}</small><em>${formatAdminPrice(row.retailProfit * row.stock)} total</em></div>
+  </article>`;
+}
+
+function applyProfitabilitySearch() {
+  const input = document.querySelector('#profitability-search');
+  const clear = document.querySelector('#clear-profitability-search');
+  const count = document.querySelector('#profitability-result-count');
+  const empty = document.querySelector('#profitability-empty');
+  const detail = document.querySelector('#profitability-detail');
+  if (!input || !detail) return;
+  const query = normalizeSearch(input.value);
+  const rows = profitabilityRows.filter(row => !query || row.search.includes(query));
+  detail.innerHTML = `<div class="profitability-table-head" aria-hidden="true"><span>Producto</span><span>Stock</span><span>Proveedor recibe</span><span>Gana proveedor</span><span>Mayorista</span><span>Minorista</span></div>${rows.map(profitabilityRowMarkup).join('')}`;
+  clear.hidden = !query;
+  count.textContent = query ? `${rows.length} de ${profitabilityRows.length} productos` : `${profitabilityRows.length} productos`;
+  empty.hidden = rows.length > 0 || profitabilityRows.length === 0;
+}
+
+const profitabilitySearch = document.querySelector('#profitability-search');
+const clearProfitabilitySearch = document.querySelector('#clear-profitability-search');
+if (profitabilitySearch) profitabilitySearch.addEventListener('input', applyProfitabilitySearch);
+if (clearProfitabilitySearch) clearProfitabilitySearch.addEventListener('click', () => {
+  profitabilitySearch.value = '';
+  applyProfitabilitySearch();
+  profitabilitySearch.focus();
+});
 
 function applyProductSearch() {
   const cards = [...list.querySelectorAll('.admin-card')];

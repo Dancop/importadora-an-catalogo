@@ -180,3 +180,17 @@
 }
 .cost-visibility-button:hover { opacity: 1; }
 .cost-hidden [data-card-cost] { letter-spacing: .08em; }
+
+
+/* ===== Ganancias visibles en resumen y detalle ===== */
+.metric-tile>em{margin-top:4px;font-style:normal;font-size:.64rem;line-height:1.2;color:var(--muted)}
+.metric-tile>em b{color:var(--navy);font-weight:800}
+.cost-tile .cost-visibility-button{justify-self:start}
+.own-cost-result>em{grid-column:1/-1;margin-top:6px;padding-top:7px;border-top:1px dashed #d7dfe3;font-style:normal;font-size:.75rem;color:var(--muted)}
+.own-cost-result>em b{color:var(--navy)}
+.profit-line{margin:1px 0 5px!important;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.72);font-size:.78rem!important;color:var(--muted)!important}
+.profit-line strong{color:var(--navy)!important;font-size:.9rem}
+@media(max-width:760px){
+  .metric-tile>em{font-size:.6rem}
+  .cost-tile .cost-visibility-button{justify-self:center}
+}

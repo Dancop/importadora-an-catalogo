@@ -75,6 +75,9 @@ function editor(p, i) {
   const ownCostValue = i.costo_propio ?? calculateOwnCost(baseValue, costFactor);
   const wholesaleValue = i.precio_mayorista ?? '';
   const retailValue = i.precio_minorista ?? '';
+  const providerProfit = calculateProfit(ownCostValue, baseValue);
+  const wholesaleProfit = calculateProfit(wholesaleValue, ownCostValue);
+  const retailProfit = calculateProfit(retailValue, ownCostValue);
   const wholesaleMultiplier = calculateMultiplier(baseValue, wholesaleValue, i.multiplicador_mayorista);
   const retailMultiplier = calculateMultiplier(baseValue, retailValue, i.multiplicador_minorista);
   const searchText = normalizeSearch([p.sku, p.codigo_modelo, p.nombre, p.color_caja, p.color_interior, p.descripcion, p.detalle_distintivo].filter(Boolean).join(' '));
@@ -90,9 +93,9 @@ function editor(p, i) {
       </div>
       <div class="admin-card-metrics" aria-label="Resumen comercial">
         <span class="metric-tile stock-tile ${stock > 0 ? '' : 'out'}"><small>Stock</small><strong data-card-stock>${stock}</strong></span>
-        <span class="metric-tile cost-tile ${catalogConfig.mostrar_costo_admin ? 'cost-visible' : 'cost-hidden'}"><small>Mi costo</small><strong data-card-cost data-cost-value="${attr(ownCostValue)}">${catalogConfig.mostrar_costo_admin ? formatAdminPrice(ownCostValue) : '••••••'}</strong><button class="cost-visibility-button" type="button" data-toggle-cost aria-label="${catalogConfig.mostrar_costo_admin ? 'Ocultar mi costo' : 'Mostrar mi costo'}">${catalogConfig.mostrar_costo_admin ? 'Ocultar' : 'Mostrar'}</button></span>
-        <span class="metric-tile wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${formatAdminPrice(wholesaleValue)}</strong></span>
-        <span class="metric-tile retail-pill"><small>Minorista</small><strong data-card-retail>${formatAdminPrice(retailValue)}</strong></span>
+        <span class="metric-tile cost-tile ${catalogConfig.mostrar_costo_admin ? 'cost-visible' : 'cost-hidden'}"><small>Proveedor recibe</small><strong data-card-cost data-cost-value="${attr(ownCostValue)}">${catalogConfig.mostrar_costo_admin ? formatAdminPrice(ownCostValue) : '••••••'}</strong><em>Proveedor gana <b data-card-provider-profit>${formatAdminPrice(providerProfit)}</b></em><button class="cost-visibility-button" type="button" data-toggle-cost aria-label="${catalogConfig.mostrar_costo_admin ? 'Ocultar monto del proveedor' : 'Mostrar monto del proveedor'}">${catalogConfig.mostrar_costo_admin ? 'Ocultar' : 'Mostrar'}</button></span>
+        <span class="metric-tile wholesale-pill"><small>Mayorista</small><strong data-card-wholesale>${formatAdminPrice(wholesaleValue)}</strong><em>Ganas <b data-card-wholesale-profit>${formatAdminPrice(wholesaleProfit)}</b></em></span>
+        <span class="metric-tile retail-pill"><small>Minorista</small><strong data-card-retail>${formatAdminPrice(retailValue)}</strong><em>Ganas <b data-card-retail-profit>${formatAdminPrice(retailProfit)}</b></em></span>
       </div>
     </header>
     <details>
@@ -106,13 +109,13 @@ function editor(p, i) {
             <div class="price-box-title"><strong>Cálculo de mi costo</strong><span>Información interna</span></div>
             <div class="field-grid cost-fields">
               <label>Precio base (Bs)<span class="field-status editable-status">Editable</span><input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}" autocomplete="off"><small>Lo que costó originalmente el producto a tu proveedor.</small></label>
-              <label>Factor de costo<input name="factor_costo" type="number" min="0" step="0.01" inputmode="decimal" value="${costFactor}"><small>Actualmente 2,60; puedes modificarlo cuando corresponda.</small></label>
+              <label>Factor de costo<input name="factor_costo" type="number" min="0" step="0.01" inputmode="decimal" value="${costFactor}"><small>Puedes modificarlo cuando corresponda.</small></label>
             </div>
-            <div class="own-cost-result" aria-live="polite"><span>Mi costo</span><strong data-own-cost>${formatAdminPrice(ownCostValue)}</strong><small>Precio base × factor de costo</small></div>
+            <div class="own-cost-result" aria-live="polite"><span>Proveedor recibe</span><strong data-own-cost>${formatAdminPrice(ownCostValue)}</strong><small>Precio base × factor de costo</small><em>Ganancia del proveedor: <b data-provider-profit>${formatAdminPrice(providerProfit)}</b></em></div>
           </div>
           <div class="sale-price-grid">
-            <div class="price-box wholesale"><div class="price-box-title"><strong>Venta mayorista</strong><span>Por cantidad</span></div><label>Precio final (Bs)<input name="precio_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_mayorista" type="number" min="0" step="0.0001" inputmode="decimal" value="${wholesaleMultiplier ?? ''}"></label></div>
-            <div class="price-box retail"><div class="price-box-title"><strong>Venta minorista</strong><span>Unidad</span></div><label>Precio final (Bs)<input name="precio_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailValue}"></label><label class="multiplier-field">Multiplicador<input name="multiplicador_minorista" type="number" min="0" step="0.0001" inputmode="decimal" value="${retailMultiplier ?? ''}"></label></div>
+            <div class="price-box wholesale"><div class="price-box-title"><strong>Venta mayorista</strong><span>Por cantidad</span></div><label>Precio final (Bs)<input name="precio_mayorista" type="number" min="0" step="0.01" inputmode="decimal" value="${wholesaleValue}"></label><p class="profit-line">Ganas <strong data-wholesale-profit>${formatAdminPrice(wholesaleProfit)}</strong> por unidad</p><label class="multiplier-field">Multiplicador<input name="multiplicador_mayorista" type="number" min="0" step="0.0001" inputmode="decimal" value="${wholesaleMultiplier ?? ''}"></label></div>
+            <div class="price-box retail"><div class="price-box-title"><strong>Venta minorista</strong><span>Unidad</span></div><label>Precio final (Bs)<input name="precio_minorista" type="number" min="0" step="0.01" inputmode="decimal" value="${retailValue}"></label><p class="profit-line">Ganas <strong data-retail-profit>${formatAdminPrice(retailProfit)}</strong> por unidad</p><label class="multiplier-field">Multiplicador<input name="multiplicador_minorista" type="number" min="0" step="0.0001" inputmode="decimal" value="${retailMultiplier ?? ''}"></label></div>
           </div>
         </section>
 
@@ -191,8 +194,18 @@ function bindCard(card) {
     const costDisplay = card.querySelector('[data-card-cost]');
     costDisplay.dataset.costValue = form.costo_propio.value;
     if (card.querySelector('.cost-tile').classList.contains('cost-visible')) costDisplay.textContent = formatAdminPrice(form.costo_propio.value);
+    const ownCost = form.costo_propio.value;
+    const providerProfit = calculateProfit(ownCost, form.precio_base.value);
+    const wholesaleProfit = calculateProfit(form.precio_mayorista.value, ownCost);
+    const retailProfit = calculateProfit(form.precio_minorista.value, ownCost);
     card.querySelector('[data-card-wholesale]').textContent = formatAdminPrice(form.precio_mayorista.value);
     card.querySelector('[data-card-retail]').textContent = formatAdminPrice(form.precio_minorista.value);
+    card.querySelector('[data-card-provider-profit]').textContent = formatAdminPrice(providerProfit);
+    card.querySelector('[data-card-wholesale-profit]').textContent = formatAdminPrice(wholesaleProfit);
+    card.querySelector('[data-card-retail-profit]').textContent = formatAdminPrice(retailProfit);
+    card.querySelector('[data-provider-profit]').textContent = formatAdminPrice(providerProfit);
+    card.querySelector('[data-wholesale-profit]').textContent = formatAdminPrice(wholesaleProfit);
+    card.querySelector('[data-retail-profit]').textContent = formatAdminPrice(retailProfit);
   };
 
   const recalculatePricesFromMultipliers = () => {
@@ -204,8 +217,12 @@ function bindCard(card) {
     const ownCost = calculateOwnCost(form.precio_base.value, form.factor_costo.value);
     form.costo_propio.value = ownCost === '' ? '' : ownCost;
     card.querySelector('[data-own-cost]').textContent = formatAdminPrice(ownCost);
-    card.querySelector('[data-card-cost]').textContent = formatAdminPrice(ownCost);
+    const costTile = card.querySelector('.cost-tile');
+    const cardCost = card.querySelector('[data-card-cost]');
+    cardCost.dataset.costValue = ownCost;
+    cardCost.textContent = costTile.classList.contains('cost-visible') ? formatAdminPrice(ownCost) : '••••••';
     recalculatePricesFromMultipliers();
+    updatePriceBadges();
   };
 
   const updateStock = () => {
@@ -226,6 +243,7 @@ function bindCard(card) {
   form.addEventListener('submit', e => save(e, card.dataset.sku));
   form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
   form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
+  card.querySelector('[data-toggle-cost]').addEventListener('click', event => toggleCardCost(card, event.currentTarget));
   form.querySelectorAll('[data-remove-photo]').forEach(b => b.addEventListener('click', () => removePhoto(card.dataset.sku, b.dataset.removePhoto)));
 }
 
@@ -237,7 +255,7 @@ function toggleCardCost(card, button) {
   tile.classList.toggle('cost-visible', show);
   value.textContent = show ? formatAdminPrice(value.dataset.costValue) : '••••••';
   button.textContent = show ? 'Ocultar' : 'Mostrar';
-  button.setAttribute('aria-label', show ? 'Ocultar mi costo' : 'Mostrar mi costo');
+  button.setAttribute('aria-label', show ? 'Ocultar monto del proveedor' : 'Mostrar monto del proveedor');
 }
 
 async function save(event, sku) {
@@ -395,6 +413,12 @@ function calculateOwnCost(baseValue, factorValue) {
   return base >= 0 && factor >= 0 && Number.isFinite(base) && Number.isFinite(factor) ? roundPrice(base * factor) : '';
 }
 
+function calculateProfit(totalValue, costValue) {
+  const total = Number(totalValue);
+  const cost = Number(costValue);
+  return Number.isFinite(total) && Number.isFinite(cost) ? roundPrice(total - cost) : '';
+}
+
 function calculateMultiplier(baseValue, priceValue, fallbackValue = null) {
   const base = Number(baseValue);
   const price = Number(priceValue);
@@ -427,7 +451,9 @@ function normalizeSearch(value) {
 
 function formatAdminPrice(value) {
   const amount = Number(value);
-  return Number.isFinite(amount) && amount > 0 ? `Bs ${Math.round(amount)}` : 'Bs —';
+  if (!Number.isFinite(amount)) return 'Bs —';
+  if (amount < 0) return `-Bs ${Math.abs(Math.round(amount))}`;
+  return `Bs ${Math.round(amount)}`;
 }
 
 function applyProductSearch() {

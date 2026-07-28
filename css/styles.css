@@ -245,3 +245,27 @@
   .profitability-detail{grid-template-columns:1fr}
   .profitability-row{grid-template-columns:1fr 1fr}
 }
+
+
+/* Identidad y permisos del usuario del panel */
+.user-role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(15, 36, 61, .14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .72);
+  font-size: .82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.admin-view[data-role="solo_lectura"] input:disabled,
+.admin-view[data-role="solo_lectura"] textarea:disabled,
+.admin-view[data-role="solo_lectura"] select:disabled {
+  opacity: .82;
+  cursor: not-allowed;
+}
+@media (max-width: 720px) {
+  .user-role-badge { width: 100%; justify-content: center; }
+}

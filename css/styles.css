@@ -308,3 +308,33 @@
   .admin-content{padding:20px 13px 35px}.panel-heading-row{align-items:stretch;flex-direction:column}.quick-sale-button{width:100%}.dashboard-grid{grid-template-columns:1fr}.dashboard-widget{padding:15px}.module-placeholder-card{padding:25px 17px}.admin-content .admin-products{grid-template-columns:1fr}
 }
 @media(max-width:520px){.dashboard-cards{grid-template-columns:1fr 1fr;gap:8px}.dashboard-card{min-height:112px;padding:13px}.dashboard-card strong{font-size:1.25rem}.dashboard-card span{font-size:.67rem}.app-sidebar{grid-template-columns:repeat(5,1fr)}.app-sidebar .admin-menu-item strong{font-size:.59rem}.dashboard-widget>header{align-items:flex-start}.dashboard-widget .text-button{font-size:.72rem}.admin-content{padding-inline:10px}}
+
+
+/* ==========================================================
+   Correcciones v0.7.1
+   Autor: Codex + Daniel
+   ========================================================== */
+.ranking-number{display:grid!important;place-items:center;width:44px;height:44px;border-radius:11px;background:#e8eef2;color:var(--navy);font-size:1rem;font-weight:800}
+
+/* En pantallas intermedias las fichas de inventario usan una sola columna.
+   Evita que precios y métricas invadan la miniatura o el nombre. */
+@media (max-width:1250px) and (min-width:701px){
+  .profitability-detail{grid-template-columns:1fr!important}
+  .profitability-row{grid-template-columns:minmax(210px,1.3fr) repeat(5,minmax(95px,1fr));gap:10px}
+  .profit-product-cell{grid-column:auto;padding-bottom:0;border-bottom:0}
+  .profit-cell{padding-top:18px}
+}
+
+/* Las tarjetas del editor conservan proporciones cómodas en escritorio. */
+@media (min-width:821px){
+  .admin-content .admin-products{grid-template-columns:1fr!important}
+  .admin-card-summary{display:grid!important;grid-template-columns:minmax(260px,1fr) minmax(520px,1.45fr);gap:18px}
+  .admin-card-metrics{width:100%;min-width:0}
+}
+
+/* Navegación inferior: icono arriba y texto exactamente centrado. */
+@media (max-width:820px){
+  .app-sidebar .admin-menu-item{width:100%;min-width:0;display:grid!important;grid-template-columns:1fr!important;grid-template-rows:29px auto!important;place-items:center!important;align-content:center!important;justify-content:center!important;gap:2px!important;padding:3px 1px!important;text-align:center!important}
+  .app-sidebar .admin-menu-item>span{grid-row:1!important;grid-column:1!important;margin:0 auto!important}
+  .app-sidebar .admin-menu-item strong{grid-row:2!important;grid-column:1!important;display:block;width:100%;margin:0!important;text-align:center!important;line-height:1.05!important;white-space:nowrap}
+}

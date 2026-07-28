@@ -20,7 +20,7 @@ export const ADMIN_PANEL_HTML = `<section id="admin-view" class="admin-view admi
         <div id="dashboard-status" class="dashboard-status">Cargando resumen…</div>
         <div id="dashboard-cards" class="dashboard-cards" aria-live="polite"></div>
         <div class="dashboard-grid">
-          <article class="dashboard-widget"><header><div><p class="eyebrow">Inventario</p><h3>Stock bajo</h3></div><button class="text-button" type="button" data-open-panel="profitability-panel">Ver inventario</button></header><div id="dashboard-low-stock" class="dashboard-list"></div></article>
+          <article class="dashboard-widget"><header><div><p class="eyebrow">Ventas</p><h3>Más vendidos</h3></div><button class="text-button" type="button" data-open-panel="sales-panel">Ver ventas</button></header><div id="dashboard-best-sellers" class="dashboard-list"></div></article>
           <article class="dashboard-widget"><header><div><p class="eyebrow">Actividad</p><h3>Ventas recientes</h3></div><button class="text-button" type="button" data-open-panel="sales-panel">Ver ventas</button></header><div id="dashboard-recent-sales" class="dashboard-list"></div></article>
         </div>
       </section>

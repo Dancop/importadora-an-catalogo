@@ -3,13 +3,14 @@
 Importadora A&N
 Módulo: Dashboard
 Autor: Codex + Daniel
-Versión: 0.7.0
+Versión: 0.7.1
 Última modificación: 2026-07-28
-Descripción: Resumen financiero, stock bajo y
-actividad reciente del panel administrativo.
+Descripción: Resumen financiero, productos más
+vendidos y actividad reciente del panel.
 ===========================================
 */
 let context = null;
+let refreshSequence = 0;
 
 export function initializeDashboard(options) {
   context = options;
@@ -19,11 +20,13 @@ export function initializeDashboard(options) {
 
 export async function refreshDashboard() {
   if (!context?.db || document.querySelector('#dashboard-panel')?.hidden) return;
+  const sequence = ++refreshSequence;
   const status = document.querySelector('#dashboard-status');
   const cards = document.querySelector('#dashboard-cards');
-  const lowStock = document.querySelector('#dashboard-low-stock');
+  const bestSellers = document.querySelector('#dashboard-best-sellers');
   const recentSales = document.querySelector('#dashboard-recent-sales');
-  if (!status || !cards) return;
+  if (!status || !cards || !bestSellers || !recentSales) return;
+
   status.hidden = false;
   status.textContent = 'Actualizando resumen…';
 
@@ -32,50 +35,71 @@ export async function refreshDashboard() {
   const end = new Date(start);
   end.setDate(end.getDate()+1);
 
-  const [summaryResult, inventoryResult, salesResult] = await Promise.all([
-    context.db.rpc('obtener_resumen_financiero', { p_desde:start.toISOString(), p_hasta:end.toISOString() }),
-    context.db.from('inventario_privado').select('sku, stock').order('stock', { ascending:true }).limit(6),
-    context.db.from('ventas').select('id, numero, fecha, total_venta, total_ganancia, estado').order('fecha', { ascending:false }).limit(5)
-  ]);
+  try {
+    const results = await Promise.allSettled([
+      context.db.rpc('obtener_resumen_financiero', { p_desde:start.toISOString(), p_hasta:end.toISOString() }),
+      context.db.from('detalle_ventas').select('sku, producto_nombre, cantidad, ventas!inner(estado)').eq('ventas.estado', 'completada').limit(500),
+      context.db.from('ventas').select('id, numero, fecha, total_venta, total_ganancia, estado').order('fecha', { ascending:false }).limit(5)
+    ]);
+    if (sequence !== refreshSequence) return;
 
-  const summary = summaryResult.data?.[0] || {};
-  cards.innerHTML = [
-    card('Ventas hoy', summary.ventas_completadas || 0, 'operaciones completadas'),
-    card('Ingresos hoy', money(summary.ingresos), 'total cobrado'),
-    card('Ganancia hoy', money(summary.ganancia_real), 'ganancia real', 'positive'),
-    card('Proveedor pendiente', money(summary.saldo_pendiente_proveedor), 'saldo acumulado', 'provider')
-  ].join('');
+    const summaryResult = settledValue(results[0]);
+    const detailResult = settledValue(results[1]);
+    const salesResult = settledValue(results[2]);
+    const summary = summaryResult?.data?.[0] || {};
 
-  if (inventoryResult.error) {
-    lowStock.innerHTML = empty('No se pudo cargar el inventario.');
-  } else if (!inventoryResult.data?.length) {
-    lowStock.innerHTML = empty('No hay productos registrados.');
-  } else {
-    const skus = inventoryResult.data.map(item => item.sku);
-    const { data: products } = await context.db.from('productos_publicos').select('sku,nombre,imagenes').in('sku', skus);
-    const map = new Map((products || []).map(item => [item.sku,item]));
-    lowStock.innerHTML = inventoryResult.data.map(item => {
-      const product = map.get(item.sku) || {};
-      const image = product.imagenes?.[0] || '../assets/logo.png';
-      return `<button class="dashboard-list-item" type="button" data-dashboard-product><img src="${escapeAttr(image)}" alt=""><span><strong>${escapeHtml(product.nombre || item.sku)}</strong><small>${escapeHtml(item.sku)}</small></span><b class="stock-pill ${item.stock <= 2 ? 'critical' : ''}">${item.stock}</b></button>`;
-    }).join('');
-    lowStock.querySelectorAll('[data-dashboard-product]').forEach(button => button.addEventListener('click', () => context.openPanel('products-panel')));
-  }
+    cards.innerHTML = [
+      card('Ventas hoy', summary.ventas_completadas || 0, 'operaciones completadas'),
+      card('Ingresos hoy', money(summary.ingresos), 'total cobrado'),
+      card('Ganancia hoy', money(summary.ganancia_real), 'ganancia real', 'positive'),
+      card('Proveedor pendiente', money(summary.saldo_pendiente_proveedor), 'saldo acumulado', 'provider')
+    ].join('');
 
-  if (salesResult.error) {
+    renderBestSellers(bestSellers, detailResult);
+    renderRecentSales(recentSales, salesResult);
+  } catch (error) {
+    console.error('No se pudo actualizar el dashboard:', error);
+    cards.innerHTML = [card('Ventas hoy', 0, 'sin datos disponibles'), card('Ingresos hoy', money(0), 'sin datos disponibles'), card('Ganancia hoy', money(0), 'sin datos disponibles', 'positive'), card('Proveedor pendiente', money(0), 'sin datos disponibles', 'provider')].join('');
+    bestSellers.innerHTML = empty('No se pudieron cargar los productos más vendidos.');
     recentSales.innerHTML = empty('No se pudo cargar el historial.');
-  } else if (!salesResult.data?.length) {
-    recentSales.innerHTML = empty('Todavía no hay ventas registradas.');
-  } else {
-    recentSales.innerHTML = salesResult.data.map(sale => `<div class="dashboard-list-item"><span class="sale-number">#${sale.numero || '—'}</span><span><strong>${money(sale.total_venta)}</strong><small>${formatDate(sale.fecha)} · ${sale.estado}</small></span><b>${money(sale.total_ganancia)}</b></div>`).join('');
+  } finally {
+    if (sequence === refreshSequence) status.hidden = true;
   }
-
-  status.hidden = true;
 }
 
+function renderBestSellers(container, result) {
+  if (!result || result.error) {
+    container.innerHTML = empty('No se pudieron cargar los productos más vendidos.');
+    return;
+  }
+  const totals = new Map();
+  for (const item of result.data || []) {
+    const current = totals.get(item.sku) || { sku:item.sku, nombre:item.producto_nombre || item.sku, cantidad:0 };
+    current.cantidad += Number(item.cantidad) || 0;
+    totals.set(item.sku, current);
+  }
+  const ranking = [...totals.values()].sort((a,b) => b.cantidad-a.cantidad).slice(0,5);
+  if (!ranking.length) {
+    container.innerHTML = empty('Aún no hay ventas para calcular este ranking.');
+    return;
+  }
+  container.innerHTML = ranking.map((item,index) => `<button class="dashboard-list-item" type="button" data-dashboard-product><span class="ranking-number">${index+1}</span><span><strong>${escapeHtml(item.nombre)}</strong><small>${escapeHtml(item.sku)}</small></span><b>${item.cantidad} ud.</b></button>`).join('');
+  container.querySelectorAll('[data-dashboard-product]').forEach(button => button.addEventListener('click', () => context.openPanel('products-panel')));
+}
+
+function renderRecentSales(container, result) {
+  if (!result || result.error) {
+    container.innerHTML = empty('No se pudo cargar el historial.');
+  } else if (!result.data?.length) {
+    container.innerHTML = empty('Todavía no hay ventas registradas.');
+  } else {
+    container.innerHTML = result.data.map(sale => `<div class="dashboard-list-item"><span class="sale-number">#${sale.numero || '—'}</span><span><strong>${money(sale.total_venta)}</strong><small>${formatDate(sale.fecha)} · ${escapeHtml(sale.estado)}</small></span><b>${money(sale.total_ganancia)}</b></div>`).join('');
+  }
+}
+
+function settledValue(result) { return result?.status === 'fulfilled' ? result.value : null; }
 function card(label, value, helper, tone='') { return `<article class="dashboard-card ${tone}"><small>${label}</small><strong>${value}</strong><span>${helper}</span></article>`; }
 function money(value) { return `Bs ${new Intl.NumberFormat('es-BO',{minimumFractionDigits:0,maximumFractionDigits:2}).format(Number(value)||0)}`; }
-function formatDate(value) { return new Intl.DateTimeFormat('es-BO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(value)); }
-function empty(message) { return `<div class="dashboard-empty">${message}</div>`; }
+function formatDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Fecha no disponible' : new Intl.DateTimeFormat('es-BO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(date); }
+function empty(message) { return `<div class="dashboard-empty">${escapeHtml(message)}</div>`; }
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function escapeAttr(value) { return String(value ?? '').replace(/[&"]/g, c => c === '&' ? '&amp;' : '&quot;'); }

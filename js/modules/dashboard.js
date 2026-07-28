@@ -3,7 +3,7 @@
 Importadora A&N
 Módulo: Dashboard
 Autor: Codex + Daniel
-Versión: 0.7.1
+Versión: 0.7.2
 Última modificación: 2026-07-28
 Descripción: Resumen financiero, productos más
 vendidos y actividad reciente del panel.
@@ -37,9 +37,9 @@ export async function refreshDashboard() {
 
   try {
     const results = await Promise.allSettled([
-      context.db.rpc('obtener_resumen_financiero', { p_desde:start.toISOString(), p_hasta:end.toISOString() }),
-      context.db.from('detalle_ventas').select('sku, producto_nombre, cantidad, ventas!inner(estado)').eq('ventas.estado', 'completada').limit(500),
-      context.db.from('ventas').select('id, numero, fecha, total_venta, total_ganancia, estado').order('fecha', { ascending:false }).limit(5)
+      withTimeout(context.db.rpc('obtener_resumen_financiero', { p_desde:start.toISOString(), p_hasta:end.toISOString() }), 10000),
+      withTimeout(context.db.from('detalle_ventas').select('sku, producto_nombre, cantidad, ventas!inner(estado)').eq('ventas.estado', 'completada').limit(500), 10000),
+      withTimeout(context.db.from('ventas').select('id, numero, fecha, total_venta, total_ganancia, estado').order('fecha', { ascending:false }).limit(5), 10000)
     ]);
     if (sequence !== refreshSequence) return;
 
@@ -103,3 +103,9 @@ function money(value) { return `Bs ${new Intl.NumberFormat('es-BO',{minimumFract
 function formatDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Fecha no disponible' : new Intl.DateTimeFormat('es-BO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(date); }
 function empty(message) { return `<div class="dashboard-empty">${escapeHtml(message)}</div>`; }
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function withTimeout(promise, milliseconds) {
+  let timer;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Tiempo de espera agotado')), milliseconds); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}

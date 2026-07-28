@@ -13,7 +13,15 @@ export const ADMIN_PANEL_HTML = `<section id="admin-view" class="admin-view admi
         <button class="admin-menu-item" data-admin-panel="users-panel" data-role-only="administrador"><span>◎</span><strong>Usuarios</strong><small>Accesos y roles</small></button>
         <button class="admin-menu-item" data-admin-panel="catalog-settings-panel" data-role-only="administrador"><span>◇</span><strong>Configuración</strong><small>Marca y precios públicos</small></button>
         <button class="admin-menu-item" data-admin-panel="whatsapp-panel" data-role-only="administrador"><span>◉</span><strong>WhatsApp</strong><small>Mensaje para compartir</small></button>
+        <button id="mobile-more-button" class="admin-menu-item mobile-more-button" type="button"><span>•••</span><strong>Más</strong><small>Otras opciones</small></button>
       </nav>
+      <div id="mobile-more-sheet" class="mobile-more-sheet" hidden>
+        <button class="mobile-more-backdrop" type="button" data-close-more aria-label="Cerrar menú"></button>
+        <section class="mobile-more-card" role="dialog" aria-modal="true" aria-label="Más opciones">
+          <header><strong>Más opciones</strong><button type="button" class="icon-button" data-close-more aria-label="Cerrar">×</button></header>
+          <div id="mobile-more-options"></div>
+        </section>
+      </div>
       <main class="admin-content">
       <section id="dashboard-panel" class="dashboard-panel" data-panel-section>
         <div class="panel-heading-row"><div><p class="eyebrow">Vista general</p><h2>Hola, <span id="dashboard-user-name">Usuario</span></h2><p id="dashboard-date">Resumen actualizado del negocio.</p></div><button class="button primary quick-sale-button" type="button" data-open-panel="sales-panel">＋ Nueva venta</button></div>

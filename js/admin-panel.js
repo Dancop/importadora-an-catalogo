@@ -3,7 +3,7 @@
 Importadora A&N
 Módulo: Panel administrativo
 Autor: Codex + Daniel
-Versión: 0.7.0
+Versión: 0.7.2
 Última modificación: 2026-07-28
 Descripción: Navegación, productos, configuración,
 rentabilidad y conexión con el dashboard.
@@ -25,6 +25,8 @@ const DEFAULT_TEMPLATE = `*{nombre}*\n\n{descripcion}\n\n*Incluye y presentació
 let shareTemplate = DEFAULT_TEMPLATE;
 let catalogConfig = { nombre_empresa:'Importadora A&N', mostrar_precios:false, mostrar_costo_admin:false, logo_url:null };
 let profitabilityRows = [];
+let productsLoaded = false;
+let productsLoading = null;
 
 document.querySelector('#logout').addEventListener('click', async () => { await db.auth.signOut(); location.reload(); });
 
@@ -43,10 +45,10 @@ function openAdminPanel(target) {
   document.querySelectorAll('[data-admin-panel]').forEach(item => item.classList.toggle('active', item.dataset.adminPanel === target));
   document.querySelectorAll('[data-panel-section]').forEach(section => { section.hidden = section.id !== target; });
   document.querySelector('#admin-title').textContent = PANEL_TITLES[target] || 'Panel';
-  document.querySelector('#admin-menu')?.classList.remove('open');
-  document.querySelector('#admin-menu-toggle')?.setAttribute('aria-expanded', 'false');
+  closeMobileMore();
   if (target === 'dashboard-panel') refreshDashboard();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if ((target === 'products-panel' || target === 'profitability-panel') && !productsLoaded) ensureProductsLoaded();
+  window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 document.querySelectorAll('[data-admin-panel]').forEach(button => button.addEventListener('click', () => openAdminPanel(button.dataset.adminPanel)));
@@ -62,8 +64,51 @@ export async function initializeAdminPanel(role, profile) {
   currentProfile = profile;
   applyRoleUI();
   initializeDashboard({ db, profile, openPanel: openAdminPanel });
-  await loadProducts();
+  initializeMobileMoreMenu();
   openAdminPanel('dashboard-panel');
+  // El inventario ya no bloquea el arranque del panel. Se carga después.
+  setTimeout(() => ensureProductsLoaded(), 0);
+}
+
+
+function withTimeout(promise, milliseconds, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} superó ${milliseconds / 1000} segundos`)), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function ensureProductsLoaded() {
+  if (productsLoaded) return Promise.resolve();
+  if (productsLoading) return productsLoading;
+  productsLoading = loadProducts()
+    .then(() => { productsLoaded = true; })
+    .catch(error => {
+      console.error('No se pudo cargar el inventario:', error);
+      status.hidden = false;
+      status.innerHTML = `No se pudo cargar el inventario. <button id="retry-products" class="text-button" type="button">Reintentar</button>`;
+      document.querySelector('#retry-products')?.addEventListener('click', () => { productsLoading = null; ensureProductsLoaded(); });
+    })
+    .finally(() => { productsLoading = null; });
+  return productsLoading;
+}
+
+function initializeMobileMoreMenu() {
+  const sheet = document.querySelector('#mobile-more-sheet');
+  const options = document.querySelector('#mobile-more-options');
+  const sourceButtons = [...document.querySelectorAll('.app-sidebar [data-admin-panel]')].slice(4);
+  if (!sheet || !options) return;
+  options.innerHTML = sourceButtons.map(button => `<button class="mobile-more-option" type="button" data-more-target="${button.dataset.adminPanel}"><span>${button.querySelector('span')?.textContent || '•'}</span><strong>${button.querySelector('strong')?.textContent || ''}</strong><small>${button.querySelector('small')?.textContent || ''}</small></button>`).join('');
+  document.querySelector('#mobile-more-button')?.addEventListener('click', () => { sheet.hidden = false; document.body.classList.add('more-open'); });
+  sheet.querySelectorAll('[data-close-more]').forEach(button => button.addEventListener('click', closeMobileMore));
+  sheet.querySelectorAll('[data-more-target]').forEach(button => button.addEventListener('click', () => openAdminPanel(button.dataset.moreTarget)));
+}
+
+function closeMobileMore() {
+  const sheet = document.querySelector('#mobile-more-sheet');
+  if (sheet) sheet.hidden = true;
+  document.body.classList.remove('more-open');
 }
 
 function applyRoleUI() {
@@ -80,9 +125,9 @@ function applyRoleUI() {
 async function loadProducts() {
   status.hidden = false; status.textContent = 'Cargando inventario…';
   const [{ data: products, error: publicError }, { data: inventory, error: privateError }, { data: config }] = await Promise.all([
-    db.from('productos_publicos').select('*').order('orden'),
-    db.from('inventario_privado').select('*'),
-    db.from('configuracion_publica').select('*').eq('id', 'catalogo').single()
+    withTimeout(db.from('productos_publicos').select('*').order('orden'), 15000, 'Productos públicos'),
+    withTimeout(db.from('inventario_privado').select('*'), 15000, 'Inventario privado'),
+    withTimeout(db.from('configuracion_publica').select('*').eq('id', 'catalogo').single(), 15000, 'Configuración')
   ]);
   if (publicError || privateError) { status.textContent = 'Esta cuenta no tiene autorización o no se pudo cargar el inventario.'; return; }
   shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;

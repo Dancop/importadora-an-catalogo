@@ -1,8 +1,6 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+import { db } from './supabase-client.js';
 import { ADMIN_PANEL_HTML } from './admin-template.js';
 
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 const loginView = document.querySelector('#login-view');
 const loginForm = document.querySelector('#login-form');
 const loginError = document.querySelector('#login-error');
@@ -50,7 +48,7 @@ async function authorizeAndLoad(session) {
   }
 
   adminMount.innerHTML = ADMIN_PANEL_HTML;
-  panelModule = await import('./admin-panel.js');
+  panelModule = await import('./admin-panel.js?v=20260728-2');
   activeUserId = session.user.id;
   loginView.hidden = true;
   loginError.textContent = '';

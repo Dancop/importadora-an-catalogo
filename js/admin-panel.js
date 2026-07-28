@@ -1,7 +1,5 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { SUPABASE_URL, SUPABASE_KEY, WHATSAPP } from './config.js';
-
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+import { db } from './supabase-client.js';
+import { WHATSAPP } from './config.js';
 const adminView = document.querySelector('#admin-view');
 let currentRole = null;
 let currentProfile = null;

@@ -48,7 +48,7 @@ async function authorizeAndLoad(session) {
   }
 
   adminMount.innerHTML = ADMIN_PANEL_HTML;
-  panelModule = await import('./admin-panel.js?v=20260728-2');
+  panelModule = await import('./admin-panel.js?v=20260728-3');
   activeUserId = session.user.id;
   loginView.hidden = true;
   loginError.textContent = '';

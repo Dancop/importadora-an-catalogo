@@ -1,5 +1,17 @@
+/*
+===========================================
+Importadora A&N
+Módulo: Panel administrativo
+Autor: Codex + Daniel
+Versión: 0.7.0
+Última modificación: 2026-07-28
+Descripción: Navegación, productos, configuración,
+rentabilidad y conexión con el dashboard.
+===========================================
+*/
 import { db } from './supabase-client.js';
 import { WHATSAPP } from './config.js';
+import { initializeDashboard, refreshDashboard } from './modules/dashboard.js';
 const adminView = document.querySelector('#admin-view');
 let currentRole = null;
 let currentProfile = null;
@@ -16,28 +28,49 @@ let profitabilityRows = [];
 
 document.querySelector('#logout').addEventListener('click', async () => { await db.auth.signOut(); location.reload(); });
 
-document.querySelectorAll('[data-admin-panel]').forEach(button => button.addEventListener('click', () => {
-  const target = button.dataset.adminPanel;
-  document.querySelectorAll('[data-admin-panel]').forEach(item => item.classList.toggle('active', item === button));
-  document.querySelector('#products-panel').hidden = target !== 'products-panel';
-  document.querySelector('#whatsapp-panel').hidden = target !== 'whatsapp-panel';
-  document.querySelector('#catalog-settings-panel').hidden = target !== 'catalog-settings-panel';
-  document.querySelector('#profitability-panel').hidden = target !== 'profitability-panel';
-  document.querySelector('#admin-title').textContent = target === 'products-panel' ? 'Productos' : target === 'profitability-panel' ? 'Rentabilidad' : target === 'catalog-settings-panel' ? 'Catálogo' : 'WhatsApp';
+const PANEL_TITLES = {
+  'dashboard-panel': 'Inicio',
+  'products-panel': 'Productos',
+  'sales-panel': 'Ventas',
+  'profitability-panel': 'Inventario',
+  'finance-panel': 'Finanzas',
+  'users-panel': 'Usuarios',
+  'catalog-settings-panel': 'Configuración',
+  'whatsapp-panel': 'WhatsApp'
+};
+
+function openAdminPanel(target) {
+  document.querySelectorAll('[data-admin-panel]').forEach(item => item.classList.toggle('active', item.dataset.adminPanel === target));
+  document.querySelectorAll('[data-panel-section]').forEach(section => { section.hidden = section.id !== target; });
+  document.querySelector('#admin-title').textContent = PANEL_TITLES[target] || 'Panel';
+  document.querySelector('#admin-menu')?.classList.remove('open');
+  document.querySelector('#admin-menu-toggle')?.setAttribute('aria-expanded', 'false');
+  if (target === 'dashboard-panel') refreshDashboard();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-}));
+}
+
+document.querySelectorAll('[data-admin-panel]').forEach(button => button.addEventListener('click', () => openAdminPanel(button.dataset.adminPanel)));
+document.querySelectorAll('[data-open-panel]').forEach(button => button.addEventListener('click', () => openAdminPanel(button.dataset.openPanel)));
+document.querySelector('#admin-menu-toggle')?.addEventListener('click', () => {
+  const menu = document.querySelector('#admin-menu');
+  const open = menu.classList.toggle('open');
+  document.querySelector('#admin-menu-toggle').setAttribute('aria-expanded', String(open));
+});
 
 export async function initializeAdminPanel(role, profile) {
   currentRole = role;
   currentProfile = profile;
   applyRoleUI();
+  initializeDashboard({ db, profile, openPanel: openAdminPanel });
   await loadProducts();
+  openAdminPanel('dashboard-panel');
 }
 
 function applyRoleUI() {
   const labels = { administrador:'Administrador', editor:'Editor', solo_lectura:'Solo lectura' };
   const badge = document.querySelector('#current-user-badge');
   if (badge) badge.textContent = `${currentProfile?.nombre || 'Usuario'} · ${labels[currentRole]}`;
+  document.querySelector('#dashboard-user-name').textContent = currentProfile?.nombre || 'Usuario';
   document.querySelectorAll('[data-role-only="administrador"]').forEach(element => {
     element.hidden = currentRole !== 'administrador';
   });
@@ -64,6 +97,9 @@ async function loadProducts() {
   document.querySelector('#show-admin-cost').checked = catalogConfig.mostrar_costo_admin;
   document.querySelector('#brand-logo-preview').src = catalogConfig.logo_url || '../assets/logo.png';
   document.querySelector('#admin-company-name').textContent = catalogConfig.nombre_empresa;
+  document.querySelector('#admin-sidebar-company').textContent = catalogConfig.nombre_empresa;
+  document.querySelector('#admin-header-logo').src = catalogConfig.logo_url || '../assets/logo.png';
+  document.querySelector('#admin-sidebar-logo').src = catalogConfig.logo_url || '../assets/logo.png';
   document.querySelector('#share-template').value = shareTemplate;
   updateTemplatePreview();
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
@@ -73,6 +109,7 @@ async function loadProducts() {
   list.querySelectorAll('.admin-card').forEach(bindCard);
   applyProductSearch();
   applyRoleRestrictions();
+  refreshDashboard();
 }
 
 

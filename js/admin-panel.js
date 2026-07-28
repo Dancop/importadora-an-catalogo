@@ -3,7 +3,7 @@
 Importadora A&N
 Módulo: Panel administrativo
 Autor: Codex + Daniel
-Versión: 0.7.2
+Versión: 0.7.3
 Última modificación: 2026-07-28
 Descripción: Navegación, productos, configuración,
 rentabilidad y conexión con el dashboard.
@@ -66,8 +66,7 @@ export async function initializeAdminPanel(role, profile) {
   initializeDashboard({ db, profile, openPanel: openAdminPanel });
   initializeMobileMoreMenu();
   openAdminPanel('dashboard-panel');
-  // El inventario ya no bloquea el arranque del panel. Se carga después.
-  setTimeout(() => ensureProductsLoaded(), 0);
+  // Productos e inventario se cargan únicamente cuando el usuario abre esos módulos.
 }
 
 
@@ -97,7 +96,7 @@ function ensureProductsLoaded() {
 function initializeMobileMoreMenu() {
   const sheet = document.querySelector('#mobile-more-sheet');
   const options = document.querySelector('#mobile-more-options');
-  const sourceButtons = [...document.querySelectorAll('.app-sidebar [data-admin-panel]')].slice(4);
+  const sourceButtons = [...document.querySelectorAll('.app-sidebar [data-admin-panel]')].slice(3);
   if (!sheet || !options) return;
   options.innerHTML = sourceButtons.map(button => `<button class="mobile-more-option" type="button" data-more-target="${button.dataset.adminPanel}"><span>${button.querySelector('span')?.textContent || '•'}</span><strong>${button.querySelector('strong')?.textContent || ''}</strong><small>${button.querySelector('small')?.textContent || ''}</small></button>`).join('');
   document.querySelector('#mobile-more-button')?.addEventListener('click', () => { sheet.hidden = false; document.body.classList.add('more-open'); });

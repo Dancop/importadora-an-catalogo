@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/styles.css?v=20260728-4">
+  <link rel="stylesheet" href="../css/styles.css?v=20260729-8">
 </head>
 <body class="admin-body">
   <main class="admin-shell">
@@ -67,8 +67,61 @@
           <article class="dashboard-widget"><header><div><p class="eyebrow">Actividad</p><h3>Ventas recientes</h3></div><button class="text-button" type="button" data-open-panel="sales-panel">Ver ventas</button></header><div id="dashboard-recent-sales" class="dashboard-list"></div></article>
         </div>
       </section>
-      <section id="sales-panel" class="module-placeholder" data-panel-section hidden>
-        <div class="module-placeholder-card"><span class="module-icon">＋</span><p class="eyebrow">Siguiente módulo</p><h2>Ventas</h2><p>La base segura ya está lista. Aquí construiremos el registro rápido de ventas, optimizado para celular y con resumen lateral en escritorio.</p><div class="placeholder-features"><span>Precio real editable</span><span>Descuento automático</span><span>Ganancia en vivo</span><span>Descuento de stock</span></div></div>
+      <section id="sales-panel" class="sales-module" data-panel-section hidden>
+        <div class="sales-heading">
+          <div><p class="eyebrow">Gestión comercial</p><h2>Ventas</h2><p>Registra exactamente el precio acordado con el cliente.</p></div>
+          <div class="sales-view-switch" role="tablist" aria-label="Secciones de ventas">
+            <button class="active" type="button" data-sales-view="new" role="tab">Nueva venta</button>
+            <button type="button" data-sales-view="history" role="tab">Historial</button>
+          </div>
+        </div>
+
+        <div id="sales-new-view" data-sales-view-panel="new" class="sales-workspace">
+          <section class="sales-products-pane">
+            <div class="sales-search-wrap">
+              <label for="sales-product-search">Buscar producto</label>
+              <input id="sales-product-search" type="search" placeholder="Nombre, código o color…" autocomplete="off">
+            </div>
+            <p id="sales-products-status" class="sales-inline-status">Abre esta sección para cargar los productos.</p>
+            <div id="sales-product-list" class="sales-product-list"></div>
+          </section>
+
+          <aside class="sales-cart-pane">
+            <header><div><p class="eyebrow">Venta actual</p><h3>Resumen</h3></div><button id="sales-clear-cart" class="text-button" type="button">Vaciar</button></header>
+            <div id="sales-cart-empty" class="sales-empty-cart">Selecciona un precio para agregar un producto.</div>
+            <div id="sales-cart-list" class="sales-cart-list"></div>
+
+            <div class="sales-customer-fields">
+              <label>Cliente <small>Opcional</small><input id="sale-client-name" type="text" maxlength="100" placeholder="Nombre del cliente"></label>
+              <label>Teléfono <small>Opcional</small><input id="sale-client-phone" type="tel" maxlength="30" placeholder="Ej. 70000000"></label>
+              <label>Método de pago<select id="sale-payment-method"><option value="">No especificado</option><option value="Transferencia">Transferencia</option><option value="Efectivo">Efectivo</option><option value="QR">QR</option><option value="Otro">Otro</option></select></label>
+              <label>Observación <small>Opcional</small><textarea id="sale-observation" rows="2" maxlength="300" placeholder="Entrega, referencia u otro detalle"></textarea></label>
+            </div>
+
+            <div class="sales-totals">
+              <div><span>Total venta</span><strong id="sale-total">Bs 0</strong></div>
+              <div><span>Proveedor</span><strong id="sale-provider-total">Bs 0</strong></div>
+              <div class="sales-profit-total"><span>Ganancia</span><strong id="sale-profit-total">Bs 0</strong></div>
+            </div>
+            <p id="sales-save-message" class="form-message" role="status"></p>
+            <button id="sales-register" class="button primary sales-register-button" type="button" disabled>Registrar venta</button>
+          </aside>
+        </div>
+
+        <div id="sales-history-view" data-sales-view-panel="history" hidden>
+          <div class="sales-history-toolbar"><div><h3>Historial de ventas</h3><p>Últimas operaciones registradas.</p></div><button id="sales-refresh-history" class="button secondary" type="button">Actualizar</button></div>
+          <p id="sales-history-status" class="sales-inline-status"></p>
+          <div id="sales-history-list" class="sales-history-list"></div>
+        </div>
+
+        <div id="sales-success" class="sales-success" hidden role="dialog" aria-modal="true" aria-labelledby="sales-success-title">
+          <div class="sales-success-card">
+            <span class="sales-success-icon">✓</span><p class="eyebrow">Operación completada</p><h2 id="sales-success-title">Venta registrada</h2>
+            <p id="sales-success-number"></p>
+            <div id="sales-success-totals" class="sales-success-totals"></div>
+            <div class="sales-success-actions"><button id="sales-new-sale" class="button primary" type="button">Nueva venta</button><button id="sales-view-history" class="button secondary" type="button">Ver historial</button></div>
+          </div>
+        </div>
       </section>
       <section id="finance-panel" class="module-placeholder" data-panel-section hidden>
         <div class="module-placeholder-card"><span class="module-icon">Bs</span><p class="eyebrow">Próximamente</p><h2>Finanzas</h2><p>Liquidaciones entregadas al proveedor, monto generado por ventas y saldo pendiente.</p></div>

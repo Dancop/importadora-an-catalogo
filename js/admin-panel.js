@@ -3,7 +3,7 @@
 Importadora A&N
 Módulo: Panel administrativo
 Autor: Codex + Daniel
-Versión: 0.7.3
+Versión: 0.8.0
 Última modificación: 2026-07-28
 Descripción: Navegación, productos, configuración,
 rentabilidad y conexión con el dashboard.
@@ -12,6 +12,7 @@ rentabilidad y conexión con el dashboard.
 import { db } from './supabase-client.js';
 import { WHATSAPP } from './config.js';
 import { initializeDashboard, refreshDashboard } from './modules/dashboard.js';
+import { initializeSales, openSales } from './modules/ventas.js';
 const adminView = document.querySelector('#admin-view');
 let currentRole = null;
 let currentProfile = null;
@@ -47,6 +48,7 @@ function openAdminPanel(target) {
   document.querySelector('#admin-title').textContent = PANEL_TITLES[target] || 'Panel';
   closeMobileMore();
   if (target === 'dashboard-panel') refreshDashboard();
+  if (target === 'sales-panel') openSales();
   if ((target === 'products-panel' || target === 'profitability-panel') && !productsLoaded) ensureProductsLoaded();
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
@@ -64,6 +66,7 @@ export async function initializeAdminPanel(role, profile) {
   currentProfile = profile;
   applyRoleUI();
   initializeDashboard({ db, profile, openPanel: openAdminPanel });
+  initializeSales({ db, role, profile, openPanel: openAdminPanel, onSaleRegistered: () => { productsLoaded = false; refreshDashboard(); } });
   initializeMobileMoreMenu();
   openAdminPanel('dashboard-panel');
   // Productos e inventario se cargan únicamente cuando el usuario abre esos módulos.

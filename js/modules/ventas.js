@@ -3,7 +3,7 @@
 Importadora A&N
 Módulo: Ventas
 Autor: Codex + Daniel
-Versión: 0.8.1
+Versión: 0.8.2
 Última modificación: 2026-07-29
 Descripción: Registro rápido de ventas con precio real editable,
 resumen de proveedor y ganancia, descuento automático de stock
@@ -17,6 +17,8 @@ let loadingPromise = null;
 let products = [];
 let cart = [];
 let saving = false;
+let editingSaleId = null;
+let selectedSale = null;
 
 const $ = selector => document.querySelector(selector);
 const money = value => `Bs ${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
@@ -39,6 +41,10 @@ function bindStaticEvents() {
   $('#sales-clear-cart')?.addEventListener('click', () => { cart = []; renderCart(); });
   $('#sales-register')?.addEventListener('click', registerSale);
   $('#sales-refresh-history')?.addEventListener('click', loadHistory);
+  $('#sales-cancel-edit')?.addEventListener('click', cancelEdit);
+  $('#sales-detail-close')?.addEventListener('click', closeSaleDetail);
+  $('#sales-detail-edit')?.addEventListener('click', beginEditSelectedSale);
+  $('#sales-detail-cancel')?.addEventListener('click', cancelSelectedSale);
   $('#sales-new-sale')?.addEventListener('click', () => { closeSuccess(); resetSale(); setView('new'); });
   $('#sales-view-history')?.addEventListener('click', () => { closeSuccess(); setView('history'); });
 }
@@ -50,10 +56,25 @@ function applyPermissions() {
 }
 
 function setView(view) {
-  document.querySelectorAll('[data-sales-view]').forEach(button => button.classList.toggle('active', button.dataset.salesView === view));
-  document.querySelectorAll('[data-sales-view-panel]').forEach(panel => { panel.hidden = panel.dataset.salesViewPanel !== view; });
-  if (view === 'new') ensureLoaded();
-  if (view === 'history') loadHistory();
+  const isHistory = view === 'history';
+  document.querySelectorAll('[data-sales-view]').forEach(button => {
+    const active = button.dataset.salesView === view;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  const newPanel = $('#sales-new-view');
+  const historyPanel = $('#sales-history-view');
+  if (newPanel) {
+    newPanel.hidden = isHistory;
+    newPanel.style.display = isHistory ? 'none' : '';
+  }
+  if (historyPanel) {
+    historyPanel.hidden = !isHistory;
+    historyPanel.style.display = isHistory ? '' : 'none';
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (isHistory) loadHistory();
+  else ensureLoaded();
 }
 
 function ensureLoaded() {
@@ -190,21 +211,24 @@ async function registerSale() {
       precio_venta_unitario: item.precio_venta,
       otros_gastos: 0
     }));
-    const { data: saleId, error } = await withTimeout(context.db.rpc('registrar_venta', {
+    const rpcName = editingSaleId ? 'editar_venta' : 'registrar_venta';
+    const rpcArgs = {
       p_productos: payload,
       p_fecha: saleDateToIso($('#sale-date').value),
       p_cliente_nombre: $('#sale-client-name').value.trim() || null,
       p_cliente_telefono: $('#sale-client-phone').value.trim() || null,
       p_metodo_pago: $('#sale-payment-method').value || null,
       p_observacion: $('#sale-observation').value.trim() || null
-    }), 20000);
+    };
+    if (editingSaleId) rpcArgs.p_venta_id = editingSaleId;
+    const { data: saleId, error } = await withTimeout(context.db.rpc(rpcName, rpcArgs), 25000);
     if (error) throw error;
     const { data: sale } = await context.db.from('ventas').select('numero,total_venta,total_costo_proveedor,total_ganancia').eq('id', saleId).single();
     const completedSale = sale || { total_venta: totals().total, total_costo_proveedor: totals().proveedor, total_ganancia: totals().total - totals().proveedor };
     loaded = false;
     products = [];
     resetSale();
-    showSuccess(completedSale);
+    showSuccess(completedSale, Boolean(editingSaleId));
     if (context.onSaleRegistered) context.onSaleRegistered();
   } catch (error) {
     console.error('No se pudo registrar la venta:', error);
@@ -216,7 +240,8 @@ async function registerSale() {
   }
 }
 
-function showSuccess(sale) {
+function showSuccess(sale, wasEdited = false) {
+  $('#sales-success-title').textContent = wasEdited ? 'Venta actualizada' : 'Venta registrada';
   $('#sales-success-number').textContent = sale.numero ? `Venta #${sale.numero}` : 'Venta guardada correctamente';
   $('#sales-success-totals').innerHTML = `<div><span>Total venta</span><strong>${money(sale.total_venta)}</strong></div><div><span>Proveedor</span><strong>${money(sale.total_costo_proveedor)}</strong></div><div><span>Ganancia</span><strong>${money(sale.total_ganancia)}</strong></div>`;
   $('#sales-success').hidden = false;
@@ -229,7 +254,10 @@ function closeSuccess() {
 }
 
 function resetSale() {
+  editingSaleId = null;
   cart = [];
+  $('#sales-edit-banner')?.setAttribute('hidden', '');
+  if ($('#sales-register')) $('#sales-register').textContent = 'Registrar venta';
   ['#sale-client-name','#sale-client-phone','#sale-observation','#sales-product-search'].forEach(selector => { if ($(selector)) $(selector).value = ''; });
   $('#sale-payment-method').value = '';
   setDefaultSaleDate();
@@ -250,7 +278,63 @@ async function loadHistory() {
     return;
   }
   status.textContent = data.length ? `${data.length} ventas recientes.` : '';
-  list.innerHTML = data.map(sale => `<article class="sales-history-item"><div class="sales-history-main"><span class="sale-number">#${sale.numero || '—'}</span><div><strong>${escapeHtml(sale.cliente_nombre || 'Cliente no especificado')}</strong><small>${formatDate(sale.fecha)}${sale.metodo_pago ? ` · ${escapeHtml(sale.metodo_pago)}` : ''}</small></div></div><div class="sales-history-values"><span>Total <strong>${money(sale.total_venta)}</strong></span><span>Proveedor <strong>${money(sale.total_costo_proveedor)}</strong></span><span>Ganancia <strong>${money(sale.total_ganancia)}</strong></span></div><span class="sale-status ${sale.estado}">${escapeHtml(sale.estado)}</span></article>`).join('') || '<div class="sales-empty-state">Todavía no hay ventas registradas.</div>';
+  list.innerHTML = data.map(sale => `<button type="button" class="sales-history-item" data-sale-id="${sale.id}"><div class="sales-history-main"><span class="sale-number">#${sale.numero || '—'}</span><div><strong>${escapeHtml(sale.cliente_nombre || 'Cliente no especificado')}</strong><small>${formatDate(sale.fecha)}${sale.metodo_pago ? ` · ${escapeHtml(sale.metodo_pago)}` : ''}</small></div></div><div class="sales-history-values"><span>Total <strong>${money(sale.total_venta)}</strong></span><span>Proveedor <strong>${money(sale.total_costo_proveedor)}</strong></span><span>Ganancia <strong>${money(sale.total_ganancia)}</strong></span></div><span class="sale-status ${sale.estado}">${escapeHtml(sale.estado)}</span></button>`).join('') || '<div class="sales-empty-state">Todavía no hay ventas registradas.</div>';
+  list.querySelectorAll('[data-sale-id]').forEach(button => button.addEventListener('click', () => openSaleDetail(button.dataset.saleId)));
+}
+
+async function openSaleDetail(saleId) {
+  const [{ data: sale, error: saleError }, { data: details, error: detailError }] = await Promise.all([
+    context.db.from('ventas').select('*').eq('id', saleId).single(),
+    context.db.from('detalle_ventas').select('*').eq('venta_id', saleId).order('creado_en')
+  ]);
+  if (saleError || detailError) return alert('No se pudo abrir el detalle de la venta.');
+  selectedSale = { ...sale, details: details || [] };
+  $('#sales-detail-title').textContent = `Venta #${sale.numero || '—'}`;
+  $('#sales-detail-meta').textContent = `${formatDate(sale.fecha)} · ${sale.cliente_nombre || 'Cliente no especificado'}`;
+  $('#sales-detail-items').innerHTML = selectedSale.details.map(item => `<div class="sales-detail-item"><div><strong>${escapeHtml(item.producto_nombre)}</strong><small>${item.cantidad} × ${money(item.precio_venta_unitario)}</small></div><strong>${money(item.subtotal)}</strong></div>`).join('');
+  $('#sales-detail-data').innerHTML = `<div><span>Teléfono</span><strong>${escapeHtml(sale.cliente_telefono || '—')}</strong></div><div><span>Pago</span><strong>${escapeHtml(sale.metodo_pago || '—')}</strong></div><div><span>Observación</span><strong>${escapeHtml(sale.observacion || '—')}</strong></div><div><span>Total</span><strong>${money(sale.total_venta)}</strong></div><div><span>Proveedor</span><strong>${money(sale.total_costo_proveedor)}</strong></div><div><span>Ganancia</span><strong>${money(sale.total_ganancia)}</strong></div>`;
+  const editable = context.role !== 'solo_lectura' && sale.estado === 'completada';
+  $('#sales-detail-edit').hidden = !editable;
+  $('#sales-detail-cancel').hidden = !editable;
+  $('#sales-detail-modal').hidden = false;
+}
+
+function closeSaleDetail() { $('#sales-detail-modal').hidden = true; selectedSale = null; }
+
+async function beginEditSelectedSale() {
+  if (!selectedSale) return;
+  const sale = selectedSale;
+  closeSaleDetail();
+  await ensureLoaded();
+  editingSaleId = sale.id;
+  cart = sale.details.map(detail => {
+    const current = products.find(product => product.sku === detail.sku) || {};
+    return { ...current, sku: detail.sku, nombre: detail.producto_nombre, imagen: detail.imagen_principal, stock: (Number(current.stock) || 0) + Number(detail.cantidad), cantidad: Number(detail.cantidad), tipo_precio: detail.tipo_precio, precio_sugerido: Number(detail.precio_sugerido_unitario), precio_venta: Number(detail.precio_venta_unitario), costo_proveedor: Number(detail.costo_proveedor_unitario) };
+  });
+  $('#sale-date').value = String(sale.fecha).slice(0, 10);
+  $('#sale-client-name').value = sale.cliente_nombre || '';
+  $('#sale-client-phone').value = sale.cliente_telefono || '';
+  $('#sale-payment-method').value = sale.metodo_pago || '';
+  $('#sale-observation').value = sale.observacion || '';
+  $('#sales-edit-banner').hidden = false;
+  $('#sales-edit-number').textContent = `Editando venta #${sale.numero || '—'}`;
+  $('#sales-register').textContent = 'Guardar cambios';
+  renderCart();
+  setView('new');
+}
+
+function cancelEdit() { resetSale(); setView('history'); }
+
+async function cancelSelectedSale() {
+  if (!selectedSale) return;
+  const reason = prompt('Indica el motivo de la anulación:');
+  if (!reason?.trim()) return;
+  const { error } = await context.db.rpc('anular_venta', { p_venta_id: selectedSale.id, p_motivo: reason.trim() });
+  if (error) return alert(`No se pudo anular la venta: ${error.message}`);
+  closeSaleDetail();
+  loaded = false; products = [];
+  await loadHistory();
+  if (context.onSaleRegistered) context.onSaleRegistered();
 }
 
 

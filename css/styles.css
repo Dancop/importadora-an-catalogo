@@ -421,3 +421,16 @@
 .sales-products-disclosure>summary{display:none;list-style:none;cursor:pointer}.sales-products-disclosure>summary::-webkit-details-marker{display:none}.sales-products-content{display:grid;gap:0}.sales-customer-fields label:first-child{grid-column:1/-1}.sales-view-switch button{min-width:120px}.sales-view-switch button.active{box-shadow:0 2px 8px rgba(7,29,45,.18)}
 @media(max-width:1050px){.sales-products-disclosure{padding:0!important;overflow:hidden}.sales-products-disclosure>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;background:#f7f9fa;color:var(--navy)}.sales-products-disclosure>summary span{display:grid;gap:2px}.sales-products-disclosure>summary small{color:var(--muted);font-weight:700}.sales-products-disclosure>summary strong{font-size:.95rem}.sales-products-disclosure>summary b{font-size:1.2rem;transition:transform .2s}.sales-products-disclosure[open]>summary b{transform:rotate(180deg)}.sales-products-content{padding:14px}.sales-cart-pane{scroll-margin-top:80px}}
 @media(max-width:700px){.sales-customer-fields label:first-child{grid-column:1/-1}.sales-heading>div:first-child p:last-child{display:none}}
+
+/* Ventas v0.8.2 */
+[data-sales-view-panel][hidden]{display:none!important}
+.sales-edit-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:13px 15px;border:1px solid #d6c17d;border-radius:14px;background:#fff8df}
+.sales-edit-banner[hidden]{display:none!important}.sales-edit-banner div{display:grid}.sales-edit-banner small{color:var(--muted)}
+.sales-history-item{width:100%;font:inherit;text-align:left;background:#fff;cursor:pointer}.sales-history-item:hover{border-color:#7e9aaa;background:#f8fbfc}
+.sales-detail-modal:not([hidden]){position:fixed;inset:0;z-index:125;display:grid;place-items:center;padding:18px;background:rgba(7,29,45,.58)}
+.sales-detail-card{width:min(100%,680px);max-height:90vh;overflow:auto;padding:24px;border-radius:22px;background:#fff;box-shadow:0 26px 70px rgba(0,0,0,.3)}
+.sales-detail-header{display:flex;justify-content:space-between;gap:16px}.sales-detail-header h2,.sales-detail-header p{margin:3px 0}.icon-button{width:38px;height:38px;border:0;border-radius:10px;background:#eef2f4;font-size:1.4rem;cursor:pointer}
+.sales-detail-items{display:grid;gap:8px;margin:18px 0}.sales-detail-item{display:flex;justify-content:space-between;gap:12px;padding:11px;border:1px solid var(--line);border-radius:12px}.sales-detail-item div{display:grid}.sales-detail-item small{color:var(--muted)}
+.sales-detail-data{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.sales-detail-data div{display:grid;gap:3px;padding:11px;border-radius:12px;background:#f3f6f7}.sales-detail-data span{font-size:.7rem;color:var(--muted)}.sales-detail-data strong{color:var(--navy)}
+.sales-detail-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.button.danger{background:#a53f3f;color:#fff;border-color:#a53f3f}
+@media(max-width:700px){.sales-edit-banner{align-items:stretch;flex-direction:column}.sales-detail-data{grid-template-columns:1fr 1fr}.sales-detail-actions{flex-direction:column}.sales-detail-actions .button{width:100%}}

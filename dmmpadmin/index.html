@@ -76,7 +76,12 @@
           </div>
         </div>
 
-        <div id="sales-new-view" data-sales-view-panel="new" class="sales-workspace">
+        <div id="sales-new-view" data-sales-view-panel="new">
+          <div id="sales-edit-banner" class="sales-edit-banner" hidden>
+            <div><strong id="sales-edit-number">Editando venta</strong><small>Corrige los datos y guarda los cambios.</small></div>
+            <button id="sales-cancel-edit" class="button secondary" type="button">Cancelar edición</button>
+          </div>
+          <div class="sales-workspace">
           <details class="sales-products-pane sales-products-disclosure" open>
             <summary><span><small>Paso 1</small><strong>Buscar y agregar productos</strong></span><b aria-hidden="true">⌄</b></summary>
             <div class="sales-products-content">
@@ -110,12 +115,29 @@
             <p id="sales-save-message" class="form-message" role="status"></p>
             <button id="sales-register" class="button primary sales-register-button" type="button" disabled>Registrar venta</button>
           </aside>
+          </div>
         </div>
 
         <div id="sales-history-view" data-sales-view-panel="history" hidden>
           <div class="sales-history-toolbar"><div><h3>Historial de ventas</h3><p>Últimas operaciones registradas.</p></div><button id="sales-refresh-history" class="button secondary" type="button">Actualizar</button></div>
           <p id="sales-history-status" class="sales-inline-status"></p>
           <div id="sales-history-list" class="sales-history-list"></div>
+        </div>
+
+        <div id="sales-detail-modal" class="sales-detail-modal" hidden role="dialog" aria-modal="true" aria-labelledby="sales-detail-title">
+          <div class="sales-detail-card">
+            <div class="sales-detail-header">
+              <div><p class="eyebrow">Detalle de venta</p><h2 id="sales-detail-title">Venta</h2><p id="sales-detail-meta"></p></div>
+              <button id="sales-detail-close" class="icon-button" type="button" aria-label="Cerrar">×</button>
+            </div>
+            <div id="sales-detail-items" class="sales-detail-items"></div>
+            <div id="sales-detail-data" class="sales-detail-data"></div>
+            <div class="sales-detail-actions">
+              <button id="sales-detail-edit" class="button primary" type="button">Editar venta</button>
+              <button id="sales-detail-cancel" class="button danger" type="button">Anular venta</button>
+              <button class="button secondary" type="button" onclick="document.getElementById('sales-detail-close').click()">Cerrar</button>
+            </div>
+          </div>
         </div>
 
         <div id="sales-success" class="sales-success" hidden role="dialog" aria-modal="true" aria-labelledby="sales-success-title">

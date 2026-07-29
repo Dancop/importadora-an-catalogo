@@ -99,7 +99,13 @@ function initializeMobileMoreMenu() {
   const sourceButtons = [...document.querySelectorAll('.app-sidebar [data-admin-panel]')].slice(3);
   if (!sheet || !options) return;
   options.innerHTML = sourceButtons.map(button => `<button class="mobile-more-option" type="button" data-more-target="${button.dataset.adminPanel}"><span>${button.querySelector('span')?.textContent || '•'}</span><strong>${button.querySelector('strong')?.textContent || ''}</strong><small>${button.querySelector('small')?.textContent || ''}</small></button>`).join('');
-  document.querySelector('#mobile-more-button')?.addEventListener('click', () => { sheet.hidden = false; document.body.classList.add('more-open'); });
+  const menuButton = document.querySelector('#mobile-more-button');
+  menuButton?.setAttribute('aria-expanded', 'false');
+  menuButton?.addEventListener('click', () => {
+    sheet.hidden = false;
+    menuButton.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('more-open');
+  });
   sheet.querySelectorAll('[data-close-more]').forEach(button => button.addEventListener('click', closeMobileMore));
   sheet.querySelectorAll('[data-more-target]').forEach(button => button.addEventListener('click', () => openAdminPanel(button.dataset.moreTarget)));
 }
@@ -107,6 +113,7 @@ function initializeMobileMoreMenu() {
 function closeMobileMore() {
   const sheet = document.querySelector('#mobile-more-sheet');
   if (sheet) sheet.hidden = true;
+  document.querySelector('#mobile-more-button')?.setAttribute('aria-expanded', 'false');
   document.body.classList.remove('more-open');
 }
 

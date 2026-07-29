@@ -375,3 +375,35 @@
   .app-sidebar .mobile-more-button{display:grid!important}
   .app-sidebar .mobile-more-button{visibility:visible!important;opacity:1!important;pointer-events:auto!important}
 }
+
+
+/* ==========================================================
+   Navegación móvil definitiva v0.7.4
+   Autor: Codex + Daniel
+   ========================================================== */
+/* En escritorio todas las opciones ya están visibles. */
+.app-sidebar .mobile-more-button{display:none!important}
+
+@media(max-width:820px){
+  .admin-app{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .app-sidebar{
+    height:calc(68px + env(safe-area-inset-bottom));
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    padding:5px 6px env(safe-area-inset-bottom);
+    overflow:visible;
+  }
+  /* Ocultar todo y mostrar únicamente los cuatro accesos principales. */
+  .app-sidebar .admin-menu-item{display:none!important}
+  .app-sidebar .admin-menu-item[data-admin-panel="dashboard-panel"],
+  .app-sidebar .admin-menu-item[data-admin-panel="products-panel"],
+  .app-sidebar .admin-menu-item[data-admin-panel="sales-panel"],
+  .app-sidebar .admin-menu-item.mobile-more-button{
+    display:grid!important;
+    visibility:visible!important;
+    opacity:1!important;
+    pointer-events:auto!important;
+  }
+  .app-sidebar .admin-menu-item.mobile-more-button{
+    grid-column:auto!important;
+  }
+}

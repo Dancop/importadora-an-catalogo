@@ -69,7 +69,7 @@
       </section>
       <section id="sales-panel" class="sales-module" data-panel-section hidden>
         <div class="sales-heading">
-          <div><p class="eyebrow">Gestión comercial</p><h2>Ventas</h2><p>Registra exactamente el precio acordado con el cliente.</p></div>
+          <div><p class="eyebrow">Gestión comercial</p><h2>Ventas</h2><p>Registra ventas y consulta operaciones anteriores.</p></div>
           <div class="sales-view-switch" role="tablist" aria-label="Secciones de ventas">
             <button class="active" type="button" data-sales-view="new" role="tab">Nueva venta</button>
             <button type="button" data-sales-view="history" role="tab">Historial</button>
@@ -77,14 +77,17 @@
         </div>
 
         <div id="sales-new-view" data-sales-view-panel="new" class="sales-workspace">
-          <section class="sales-products-pane">
-            <div class="sales-search-wrap">
-              <label for="sales-product-search">Buscar producto</label>
-              <input id="sales-product-search" type="search" placeholder="Nombre, código o color…" autocomplete="off">
+          <details class="sales-products-pane sales-products-disclosure" open>
+            <summary><span><small>Paso 1</small><strong>Buscar y agregar productos</strong></span><b aria-hidden="true">⌄</b></summary>
+            <div class="sales-products-content">
+              <div class="sales-search-wrap">
+                <label for="sales-product-search">Buscar producto</label>
+                <input id="sales-product-search" type="search" placeholder="Nombre, código o color…" autocomplete="off">
+              </div>
+              <p id="sales-products-status" class="sales-inline-status">Cargando productos…</p>
+              <div id="sales-product-list" class="sales-product-list"></div>
             </div>
-            <p id="sales-products-status" class="sales-inline-status">Abre esta sección para cargar los productos.</p>
-            <div id="sales-product-list" class="sales-product-list"></div>
-          </section>
+          </details>
 
           <aside class="sales-cart-pane">
             <header><div><p class="eyebrow">Venta actual</p><h3>Resumen</h3></div><button id="sales-clear-cart" class="text-button" type="button">Vaciar</button></header>
@@ -92,6 +95,7 @@
             <div id="sales-cart-list" class="sales-cart-list"></div>
 
             <div class="sales-customer-fields">
+              <label>Fecha de la venta<input id="sale-date" type="date" required></label>
               <label>Cliente <small>Opcional</small><input id="sale-client-name" type="text" maxlength="100" placeholder="Nombre del cliente"></label>
               <label>Teléfono <small>Opcional</small><input id="sale-client-phone" type="tel" maxlength="30" placeholder="Ej. 70000000"></label>
               <label>Método de pago<select id="sale-payment-method"><option value="">No especificado</option><option value="Transferencia">Transferencia</option><option value="Efectivo">Efectivo</option><option value="QR">QR</option><option value="Otro">Otro</option></select></label>

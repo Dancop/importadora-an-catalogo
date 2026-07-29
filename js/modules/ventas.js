@@ -3,11 +3,11 @@
 Importadora A&N
 Módulo: Ventas
 Autor: Codex + Daniel
-Versión: 0.8.0
+Versión: 0.8.1
 Última modificación: 2026-07-29
 Descripción: Registro rápido de ventas con precio real editable,
 resumen de proveedor y ganancia, descuento automático de stock
-e historial básico de operaciones.
+e historial separado de operaciones, con fecha de venta editable.
 ===========================================
 */
 
@@ -26,6 +26,7 @@ export function initializeSales(options) {
   context = options;
   bindStaticEvents();
   applyPermissions();
+  setDefaultSaleDate();
 }
 
 export function openSales() {
@@ -131,7 +132,7 @@ function renderCart() {
       <div class="sales-cart-product">${item.imagen ? `<img src="${escapeHtml(item.imagen)}" alt="">` : ''}<div><strong>${escapeHtml(item.nombre)}</strong><small>${item.tipo_precio === 'mayorista' ? 'Mayorista' : 'Minorista'} sugerido: ${money(item.precio_sugerido)}</small></div><button type="button" data-remove-cart aria-label="Quitar producto">×</button></div>
       <div class="sales-cart-controls">
         <label>Cantidad<div class="quantity-control"><button type="button" data-qty="-1">−</button><input type="number" min="1" max="${item.stock}" value="${item.cantidad}" inputmode="numeric" data-cart-quantity><button type="button" data-qty="1">＋</button></div></label>
-        <label>Precio vendido <div class="price-input"><span>Bs</span><input type="number" min="0" step="0.01" value="${item.precio_venta}" inputmode="decimal" data-cart-price></div>${item.precio_venta !== item.precio_sugerido ? '<small class="custom-price-note">Precio acordado</small>' : ''}</label>
+        <label>Precio vendido <div class="price-input"><span>Bs</span><input type="number" min="0" step="0.01" value="${item.precio_venta}" inputmode="decimal" data-cart-price></div></label>
       </div>
       <div class="sales-cart-item-totals"><span>Subtotal <strong>${money(item.cantidad * item.precio_venta)}</strong></span><span>Proveedor <strong>${money(item.cantidad * item.costo_proveedor)}</strong></span><span>Ganancia <strong>${money(item.cantidad * (item.precio_venta - item.costo_proveedor))}</strong></span></div>
     </article>`).join('');
@@ -191,7 +192,7 @@ async function registerSale() {
     }));
     const { data: saleId, error } = await withTimeout(context.db.rpc('registrar_venta', {
       p_productos: payload,
-      p_fecha: new Date().toISOString(),
+      p_fecha: saleDateToIso($('#sale-date').value),
       p_cliente_nombre: $('#sale-client-name').value.trim() || null,
       p_cliente_telefono: $('#sale-client-phone').value.trim() || null,
       p_metodo_pago: $('#sale-payment-method').value || null,
@@ -199,9 +200,11 @@ async function registerSale() {
     }), 20000);
     if (error) throw error;
     const { data: sale } = await context.db.from('ventas').select('numero,total_venta,total_costo_proveedor,total_ganancia').eq('id', saleId).single();
-    showSuccess(sale || { total_venta: totals().total, total_costo_proveedor: totals().proveedor, total_ganancia: totals().total - totals().proveedor });
+    const completedSale = sale || { total_venta: totals().total, total_costo_proveedor: totals().proveedor, total_ganancia: totals().total - totals().proveedor };
     loaded = false;
     products = [];
+    resetSale();
+    showSuccess(completedSale);
     if (context.onSaleRegistered) context.onSaleRegistered();
   } catch (error) {
     console.error('No se pudo registrar la venta:', error);
@@ -227,8 +230,9 @@ function closeSuccess() {
 
 function resetSale() {
   cart = [];
-  ['#sale-client-name','#sale-client-phone','#sale-observation'].forEach(selector => { $(selector).value = ''; });
+  ['#sale-client-name','#sale-client-phone','#sale-observation','#sales-product-search'].forEach(selector => { if ($(selector)) $(selector).value = ''; });
   $('#sale-payment-method').value = '';
+  setDefaultSaleDate();
   $('#sales-save-message').textContent = '';
   renderCart();
   ensureLoaded();
@@ -247,6 +251,23 @@ async function loadHistory() {
   }
   status.textContent = data.length ? `${data.length} ventas recientes.` : '';
   list.innerHTML = data.map(sale => `<article class="sales-history-item"><div class="sales-history-main"><span class="sale-number">#${sale.numero || '—'}</span><div><strong>${escapeHtml(sale.cliente_nombre || 'Cliente no especificado')}</strong><small>${formatDate(sale.fecha)}${sale.metodo_pago ? ` · ${escapeHtml(sale.metodo_pago)}` : ''}</small></div></div><div class="sales-history-values"><span>Total <strong>${money(sale.total_venta)}</strong></span><span>Proveedor <strong>${money(sale.total_costo_proveedor)}</strong></span><span>Ganancia <strong>${money(sale.total_ganancia)}</strong></span></div><span class="sale-status ${sale.estado}">${escapeHtml(sale.estado)}</span></article>`).join('') || '<div class="sales-empty-state">Todavía no hay ventas registradas.</div>';
+}
+
+
+function setDefaultSaleDate() {
+  const input = $('#sale-date');
+  if (!input) return;
+  const now = new Date();
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  input.value = localDate;
+  input.max = localDate;
+}
+
+function saleDateToIso(value) {
+  if (!value) return new Date().toISOString();
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return new Date().toISOString();
+  return date.toISOString();
 }
 
 function formatDate(value) {

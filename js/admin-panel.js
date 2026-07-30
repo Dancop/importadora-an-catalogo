@@ -122,9 +122,17 @@ function closeMobileMore() {
 
 function applyRoleUI() {
   const labels = { administrador:'Administrador', editor:'Editor', solo_lectura:'Solo lectura' };
-  const badge = document.querySelector('#current-user-badge');
-  if (badge) badge.textContent = `${currentProfile?.nombre || 'Usuario'} · ${labels[currentRole]}`;
-  document.querySelector('#dashboard-user-name').textContent = currentProfile?.nombre || 'Usuario';
+  const userName = currentProfile?.nombre || 'Usuario';
+  const roleLabel = labels[currentRole] || 'Usuario';
+  const nameElement = document.querySelector('#current-user-name');
+  const roleElement = document.querySelector('#current-user-role');
+  const avatarElement = document.querySelector('#current-user-avatar');
+  if (nameElement) nameElement.textContent = userName;
+  if (roleElement) roleElement.textContent = roleLabel;
+  if (avatarElement) avatarElement.textContent = userName.trim().charAt(0).toUpperCase() || 'U';
+  const profileElement = document.querySelector('#current-user-badge');
+  if (profileElement) profileElement.setAttribute('aria-label', `${userName}, ${roleLabel}`);
+  document.querySelector('#dashboard-user-name').textContent = userName;
   document.querySelectorAll('[data-role-only="administrador"]').forEach(element => {
     element.hidden = currentRole !== 'administrador';
   });

@@ -3,8 +3,8 @@
 Importadora A&N
 Módulo: Dashboard
 Autor: Codex + Daniel
-Versión: 0.7.2
-Última modificación: 2026-07-28
+Versión: 0.8.3
+Última modificación: 2026-07-30
 Descripción: Resumen financiero, productos más
 vendidos y actividad reciente del panel.
 ===========================================
@@ -38,20 +38,23 @@ export async function refreshDashboard() {
   try {
     const results = await Promise.allSettled([
       withTimeout(context.db.rpc('obtener_resumen_financiero', { p_desde:start.toISOString(), p_hasta:end.toISOString() }), 10000),
+      withTimeout(context.db.rpc('obtener_resumen_financiero', { p_desde:null, p_hasta:null }), 10000),
       withTimeout(context.db.from('detalle_ventas').select('sku, producto_nombre, cantidad, ventas!inner(estado)').eq('ventas.estado', 'completada').limit(500), 10000),
       withTimeout(context.db.from('ventas').select('id, numero, fecha, total_venta, total_ganancia, estado').order('fecha', { ascending:false }).limit(5), 10000)
     ]);
     if (sequence !== refreshSequence) return;
 
     const summaryResult = settledValue(results[0]);
-    const detailResult = settledValue(results[1]);
-    const salesResult = settledValue(results[2]);
+    const allTimeResult = settledValue(results[1]);
+    const detailResult = settledValue(results[2]);
+    const salesResult = settledValue(results[3]);
     const summary = summaryResult?.data?.[0] || {};
+    const allTimeSummary = allTimeResult?.data?.[0] || {};
 
     cards.innerHTML = [
       card('Ventas hoy', summary.ventas_completadas || 0, 'operaciones completadas'),
       card('Ingresos hoy', money(summary.ingresos), 'total cobrado'),
-      card('Ganancia hoy', money(summary.ganancia_real), 'ganancia real', 'positive'),
+      card('Nuestra ganancia', money(allTimeSummary.ganancia_real), 'ganancia acumulada', 'positive'),
       card('Proveedor pendiente', money(summary.saldo_pendiente_proveedor), 'saldo acumulado', 'provider')
     ].join('');
 
@@ -59,7 +62,7 @@ export async function refreshDashboard() {
     renderRecentSales(recentSales, salesResult);
   } catch (error) {
     console.error('No se pudo actualizar el dashboard:', error);
-    cards.innerHTML = [card('Ventas hoy', 0, 'sin datos disponibles'), card('Ingresos hoy', money(0), 'sin datos disponibles'), card('Ganancia hoy', money(0), 'sin datos disponibles', 'positive'), card('Proveedor pendiente', money(0), 'sin datos disponibles', 'provider')].join('');
+    cards.innerHTML = [card('Ventas hoy', 0, 'sin datos disponibles'), card('Ingresos hoy', money(0), 'sin datos disponibles'), card('Nuestra ganancia', money(0), 'sin datos disponibles', 'positive'), card('Proveedor pendiente', money(0), 'sin datos disponibles', 'provider')].join('');
     bestSellers.innerHTML = empty('No se pudieron cargar los productos más vendidos.');
     recentSales.innerHTML = empty('No se pudo cargar el historial.');
   } finally {

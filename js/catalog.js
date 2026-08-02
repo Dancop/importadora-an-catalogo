@@ -23,6 +23,55 @@ function applyBrand() {
 const money = value => value == null ? 'Consultar precio' : `Bs ${Number(value).toLocaleString('es-BO', { maximumFractionDigits: 2 })}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 
+const COLOR_STYLES = {
+  negro: '#1f2933', negra: '#1f2933',
+  blanco: '#f8fafc', blanca: '#f8fafc',
+  rosa: '#e9a5b5', rosado: '#e9a5b5', rosada: '#e9a5b5',
+  azul: '#4f78a8', celeste: '#79b7d3',
+  cafe: '#8a6548', café: '#8a6548', marron: '#8a6548', marrón: '#8a6548',
+  rojo: '#b84045', roja: '#b84045',
+  verde: '#4f8663', lila: '#9b83bd', morado: '#76558f', morada: '#76558f',
+  dorado: '#c5a45b', dorada: '#c5a45b', plateado: '#aeb7c1', plateada: '#aeb7c1',
+  beige: '#d6c2a3', crema: '#eadfc8', gris: '#8b949e'
+};
+
+function normalizeText(value = '') {
+  return String(value).trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function productDisplayName(product) {
+  let name = String(product.nombre || '').trim();
+  const colors = product.variants.map(v => v.color_caja).filter(Boolean).sort((a, b) => String(b).length - String(a).length);
+  for (const color of colors) {
+    const escaped = String(color).replace(/[.*+?^${}()|[\]\]/g, '\$&');
+    name = name.replace(new RegExp(`\s*[-–—|/]?\s*${escaped}\s*$`, 'i'), '').trim();
+  }
+  return name || product.nombre || 'Producto';
+}
+
+function variantColors(product) {
+  const seen = new Set();
+  return product.variants.map(v => String(v.color_caja || '').trim()).filter(color => {
+    if (!color) return false;
+    const key = normalizeText(color);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function colorValue(color) {
+  return COLOR_STYLES[normalizeText(color)] || '#d7dee3';
+}
+
+function colorChips(product, compact = false) {
+  const colors = variantColors(product);
+  if (!colors.length) return '<span class="presentation-label">Varias presentaciones</span>';
+  const visible = compact ? colors.slice(0, 5) : colors;
+  const remaining = colors.length - visible.length;
+  return `${visible.map(color => `<span class="color-chip" title="${escapeHtml(color)}"><i style="--chip-color:${escapeHtml(colorValue(color))}"></i><span>${escapeHtml(color)}</span></span>`).join('')}${remaining > 0 ? `<span class="color-more">+${remaining}</span>` : ''}`;
+}
+
 function groupProducts(rows) {
   const map = new Map();
   rows.filter(row => row.disponible !== false).forEach(row => {
@@ -43,10 +92,18 @@ function card(product) {
   const available = product.variants.some(v => v.disponible);
   const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
   const price = showPrices && prices.length ? money(Math.min(...prices)) : 'Consultar por WhatsApp';
+  const colors = variantColors(product);
+  const optionCount = colors.length || product.variants.length;
+  const optionLabel = optionCount === 1 ? '1 presentación' : `${optionCount} opciones`;
+  const actionLabel = optionCount > 1 ? 'Elegir opción →' : 'Ver detalles →';
   return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}">
-    <div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span></div>
-    <div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(product.nombre)}</h3>
-    <p class="summary">${escapeHtml(product.descripcion)}</p><div class="card-bottom"><strong>${price}</strong><button class="text-button" type="button">Ver detalles →</button></div></div>
+    <div class="product-image">${cover(product)}
+      <span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span>
+      ${optionCount > 1 ? `<span class="option-count">${escapeHtml(optionLabel)}</span>` : ''}
+    </div>
+    <div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(productDisplayName(product))}</h3>
+    <div class="product-options" aria-label="Colores disponibles"><span class="options-title">${colors.length ? 'Colores disponibles' : 'Presentaciones disponibles'}</span><div class="color-chips">${colorChips(product, true)}</div></div>
+    <p class="summary">${escapeHtml(product.descripcion)}</p><div class="card-bottom"><strong>${price}</strong><button class="text-button" type="button">${actionLabel}</button></div></div>
   </article>`;
 }
 
@@ -91,12 +148,12 @@ function openProduct(code) {
   const renderDialog = () => {
     const selected = product.variants[selectedIndex];
     const images = variantImages(selected, product);
-    content.innerHTML = `<div class="dialog-gallery" data-dialog-gallery>${galleryMarkup(images, product.nombre)}</div>
+    content.innerHTML = `<div class="dialog-gallery" data-dialog-gallery>${galleryMarkup(images, productDisplayName(product))}</div>
       <div class="dialog-details">
         <p class="eyebrow">${escapeHtml(product.categoria)}</p>
-        <h2>${escapeHtml(product.nombre)}</h2>
+        <h2>${escapeHtml(productDisplayName(product))}</h2>
         <p>${escapeHtml(product.descripcion)}</p>
-        <div class="presentation-heading"><div><h3>Presentaciones</h3><p>Selecciona una opción para ver sus fotografías y detalles.</p></div></div>
+        <div class="presentation-heading"><div><h3>Elige un color o presentación</h3><p>Selecciona una opción para cambiar las fotografías, disponibilidad y código.</p></div></div>
         <div class="variants">${product.variants.map((v, index) => variantMarkup(v, index, selectedIndex)).join('')}</div>
         <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" data-variant-whatsapp>Consultar por WhatsApp</a><button id="share-product" class="button secondary" type="button">Compartir</button></div>
       </div>`;
@@ -133,7 +190,7 @@ function openProduct(code) {
     }));
 
     const selectedLabel = selected.color_caja || 'Presentación';
-    const whatsappText = `Hola, quisiera consultar por ${product.nombre}, presentación ${selectedLabel} (${selected.sku}).`;
+    const whatsappText = `Hola, quisiera consultar por ${productDisplayName(product)}, presentación ${selectedLabel} (${selected.sku}).`;
     content.querySelector('[data-variant-whatsapp]').href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(whatsappText)}`;
     content.querySelector('#share-product').addEventListener('click', () => shareProduct(product, selected, images[galleryIndex] || images[0]));
   };
@@ -147,7 +204,7 @@ async function shareProduct(product, variant, imageUrl) {
   const available = variant.disponible ? 'Disponible' : 'Agotado';
   const presentation = [variant.color_caja ? `Caja ${variant.color_caja}` : '', variant.color_interior ? `interior ${variant.color_interior}` : ''].filter(Boolean).join(', ');
   const text = applyTemplate(shareTemplate, {
-    nombre: product.nombre,
+    nombre: productDisplayName(product),
     descripcion: product.descripcion,
     detalle: [presentation, variant.detalle_distintivo].filter(Boolean).join('\n'),
     precio: priceText,
@@ -160,10 +217,10 @@ async function shareProduct(product, variant, imageUrl) {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
       const extension = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
-      const safeName = product.nombre.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      const safeName = productDisplayName(product).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
       const file = new File([blob], `${safeName}.${extension}`, { type: blob.type || 'image/jpeg' });
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ title: product.nombre, text, files: [file] });
+        await navigator.share({ title: productDisplayName(product), text, files: [file] });
         return;
       }
     } catch (error) {
@@ -171,7 +228,7 @@ async function shareProduct(product, variant, imageUrl) {
     }
   }
   if (navigator.share) {
-    try { await navigator.share({ title: product.nombre, text }); return; }
+    try { await navigator.share({ title: productDisplayName(product), text }); return; }
     catch (error) { if (error?.name === 'AbortError') return; }
   }
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');

@@ -46,6 +46,28 @@ function presentationLabel(variant) {
   return [exterior, interior ? `interior ${interior}` : ''].filter(Boolean).join(' / ') || 'Presentación';
 }
 
+function productDisplayName(product) {
+  const name = String(product?.nombre || '').trim();
+  if (!name) return 'Producto';
+  const colors = (product?.variants || [])
+    .map(v => String(v.color_caja || '').replace(/^caja\s+/i, '').trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  for (const color of colors) {
+    const escaped = color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const result = name.replace(new RegExp(`\\s+${escaped}\\s*$`, 'i'), '').trim();
+    if (result && result !== name) return result;
+  }
+  return name;
+}
+
+function variantThumbnail(variant, product) {
+  const image = variantImages(variant, product)[0];
+  return image
+    ? `<img class="variant-thumb" src="${escapeHtml(image)}" alt="${escapeHtml(presentationLabel(variant))}" loading="lazy">`
+    : `<span class="variant-thumb variant-thumb-placeholder" aria-hidden="true">◫</span>`;
+}
+
 function colorDot(hex, label, extraClass = '') {
   const validHex = /^#[0-9a-f]{6}$/i.test(String(hex || '').trim());
   const isAssorted = /surtid|variad|multicolor/i.test(String(label || ''));
@@ -78,14 +100,17 @@ function cover(product) {
 function card(product) {
   const available = product.variants.some(v => v.disponible);
   const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
-  const price = showPrices && prices.length ? money(Math.min(...prices)) : 'Consultar por WhatsApp';
+  const displayName = productDisplayName(product);
   const countBadge = product.variants.length > 1 ? `<span class="variant-count">${product.variants.length} presentaciones</span>` : '';
   const action = product.variants.length > 1 ? 'Elegir presentación →' : 'Ver detalles →';
+  const bottom = showPrices
+    ? `<div class="card-bottom"><strong>${prices.length ? money(Math.min(...prices)) : 'Consultar precio'}</strong><button class="text-button" type="button">${action}</button></div>`
+    : `<div class="card-bottom price-hidden"><button class="text-button catalog-cta" type="button">${action}</button></div>`;
   return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}">
     <div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span>${countBadge}</div>
-    <div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(product.nombre)}</h3>
+    <div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(displayName)}</h3>
     ${presentationChips(product)}
-    <p class="summary">${escapeHtml(product.descripcion)}</p><div class="card-bottom"><strong>${price}</strong><button class="text-button" type="button">${action}</button></div></div>
+    <p class="summary">${escapeHtml(product.descripcion)}</p>${bottom}</div>
   </article>`;
 }
 
@@ -112,19 +137,25 @@ function galleryMarkup(images, productName) {
     <p class="gallery-counter"><span data-gallery-current>1</span> de <span data-gallery-total>${list.length}</span></p>`;
 }
 
-function variantMarkup(v, index, selectedIndex) {
+function variantMarkup(v, index, selectedIndex, product) {
   const exterior = String(v.color_caja || '').replace(/^caja\s+/i, '').trim() || 'Sin especificar';
   const interior = String(v.color_interior || '').trim();
-  return `<button type="button" class="variant-card${index === selectedIndex ? ' active' : ''}" data-variant-index="${index}" ${v.disponible ? '' : 'disabled'}>
-    <span class="variant-card-top">
-      <span class="variant-colors">
-        <span class="variant-color-row">${colorDot(v.color_exterior_hex, `Exterior: ${exterior}`, 'exterior')}</span>
-        ${interior ? `<span class="variant-color-row">${colorDot(v.color_interior_hex, `Interior: ${interior}`, 'interior')}</span>` : ''}
+  const label = [exterior, interior].filter(Boolean).join(' / ');
+  const priceMarkup = showPrices && v.precio_minorista != null
+    ? `<strong class="variant-price">${money(v.precio_minorista)}</strong>`
+    : '';
+  return `<button type="button" class="variant-card${index === selectedIndex ? ' active' : ''}" data-variant-index="${index}" ${v.disponible ? '' : 'disabled'} aria-pressed="${index === selectedIndex}">
+    ${variantThumbnail(v, product)}
+    <span class="variant-card-copy">
+      <strong class="variant-name">${escapeHtml(label || 'Presentación')}</strong>
+      <span class="variant-color-summary">
+        ${colorDot(v.color_exterior_hex, exterior, 'exterior')}
+        ${interior ? `<span class="variant-interior">/ ${colorDot(v.color_interior_hex, interior, 'interior')}</span>` : ''}
       </span>
-      <span class="variant-selected-mark" aria-hidden="true">✓</span>
+      <span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span>
     </span>
-    <span class="variant-description">${escapeHtml(v.detalle_distintivo || '')}</span>
-    <span class="variant-footer"><span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span><strong>${showPrices ? money(v.precio_minorista) : 'Consultar por WhatsApp'}</strong></span>
+    ${priceMarkup}
+    <span class="variant-selected-mark" aria-hidden="true">✓</span>
   </button>`;
 }
 
@@ -139,13 +170,35 @@ function openProduct(code) {
   const renderDialog = () => {
     const selected = product.variants[selectedIndex];
     const images = variantImages(selected, product);
-    content.innerHTML = `<div class="dialog-gallery" data-dialog-gallery>${galleryMarkup(images, product.nombre)}</div>
+    const displayName = productDisplayName(product);
+    const selectedLabel = presentationLabel(selected);
+    const selectedPrice = showPrices && selected.precio_minorista != null
+      ? `<strong class="selected-price">${money(selected.precio_minorista)}</strong>`
+      : '';
+
+    content.innerHTML = `<div class="dialog-gallery" data-dialog-gallery>${galleryMarkup(images, displayName)}</div>
       <div class="dialog-details">
-        <p class="eyebrow">${escapeHtml(product.categoria)}</p>
-        <h2>${escapeHtml(product.nombre)}</h2>
-        <p>${escapeHtml(product.descripcion)}</p>
-        <div class="presentation-heading"><div><h3>Elige una presentación</h3><p>Selecciona la combinación de color exterior e interior que prefieras.</p></div></div>
-        <div class="variants">${product.variants.map((v, index) => variantMarkup(v, index, selectedIndex)).join('')}</div>
+        <div class="dialog-product-heading">
+          <p class="eyebrow">${escapeHtml(product.categoria)}</p>
+          <h2>${escapeHtml(displayName)}</h2>
+          ${selectedPrice}
+        </div>
+        <section class="presentation-selector" aria-label="Presentaciones del producto">
+          <div class="presentation-heading">
+            <div><h3>Elige una presentación</h3><p>Selecciona una opción para cambiar la fotografía y los detalles.</p></div>
+            <div class="variant-navigation" aria-label="Navegar presentaciones">
+              <button type="button" class="variant-nav variant-prev" aria-label="Presentación anterior">‹</button>
+              <button type="button" class="variant-nav variant-next" aria-label="Presentación siguiente">›</button>
+            </div>
+          </div>
+          <p class="selected-presentation">Seleccionado: <strong>${escapeHtml(selectedLabel)}</strong></p>
+          <div class="variants" data-variants-strip>${product.variants.map((v, index) => variantMarkup(v, index, selectedIndex, product)).join('')}</div>
+        </section>
+        <section class="dialog-description">
+          <h3>Descripción</h3>
+          <p>${escapeHtml(product.descripcion)}</p>
+          ${selected.detalle_distintivo ? `<p class="variant-detail">${escapeHtml(selected.detalle_distintivo)}</p>` : ''}
+        </section>
         <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" data-variant-whatsapp>Consultar por WhatsApp</a><button id="share-product" class="button secondary" type="button">Compartir</button></div>
       </div>`;
 
@@ -156,34 +209,52 @@ function openProduct(code) {
       galleryIndex = (next + slides.length) % slides.length;
       slides.forEach((slide, i) => slide.classList.toggle('active', i === galleryIndex));
       thumbs.forEach((thumb, i) => thumb.classList.toggle('active', i === galleryIndex));
-      content.querySelector('[data-gallery-current]').textContent = galleryIndex + 1;
+      const current = content.querySelector('[data-gallery-current]');
+      if (current) current.textContent = galleryIndex + 1;
       slides[galleryIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     };
 
-    content.querySelector('.gallery-prev').addEventListener('click', () => setGallery(galleryIndex - 1));
-    content.querySelector('.gallery-next').addEventListener('click', () => setGallery(galleryIndex + 1));
+    content.querySelector('.gallery-prev')?.addEventListener('click', () => setGallery(galleryIndex - 1));
+    content.querySelector('.gallery-next')?.addEventListener('click', () => setGallery(galleryIndex + 1));
     content.querySelectorAll('[data-gallery-go]').forEach(button => button.addEventListener('click', () => setGallery(Number(button.dataset.galleryGo))));
     const track = content.querySelector('.gallery-track');
-    track.addEventListener('scroll', () => {
+    track?.addEventListener('scroll', () => {
       const width = track.clientWidth || 1;
       const next = Math.round(track.scrollLeft / width);
       if (next !== galleryIndex) {
         galleryIndex = Math.max(0, Math.min(next, images.length - 1));
         content.querySelectorAll('.gallery-thumb').forEach((thumb, i) => thumb.classList.toggle('active', i === galleryIndex));
-        content.querySelector('[data-gallery-current]').textContent = galleryIndex + 1;
+        const current = content.querySelector('[data-gallery-current]');
+        if (current) current.textContent = galleryIndex + 1;
       }
     }, { passive: true });
 
-    content.querySelectorAll('[data-variant-index]').forEach(button => button.addEventListener('click', () => {
-      selectedIndex = Number(button.dataset.variantIndex);
+    const selectVariant = index => {
+      const next = product.variants[index];
+      if (!next || !next.disponible || index === selectedIndex) return;
+      selectedIndex = index;
       galleryIndex = 0;
       renderDialog();
-    }));
+      requestAnimationFrame(() => {
+        const active = content.querySelector('.variant-card.active');
+        active?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      });
+    };
 
-    const selectedLabel = presentationLabel(selected);
-    const whatsappText = `Hola, quisiera consultar por ${product.nombre}, presentación ${selectedLabel} (${selected.sku}).`;
+    content.querySelectorAll('[data-variant-index]').forEach(button => button.addEventListener('click', () => selectVariant(Number(button.dataset.variantIndex))));
+
+    const moveVariant = direction => {
+      const available = product.variants.map((v, i) => v.disponible ? i : -1).filter(i => i >= 0);
+      if (!available.length) return;
+      const position = Math.max(0, available.indexOf(selectedIndex));
+      selectVariant(available[(position + direction + available.length) % available.length]);
+    };
+    content.querySelector('.variant-prev')?.addEventListener('click', () => moveVariant(-1));
+    content.querySelector('.variant-next')?.addEventListener('click', () => moveVariant(1));
+
+    const whatsappText = `Hola, quisiera consultar por ${displayName}, presentación ${selectedLabel} (${selected.sku}).`;
     content.querySelector('[data-variant-whatsapp]').href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(whatsappText)}`;
-    content.querySelector('#share-product').addEventListener('click', () => shareProduct(product, selected, images[galleryIndex] || images[0]));
+    content.querySelector('#share-product').addEventListener('click', () => shareProduct({ ...product, nombre: displayName }, selected, images[galleryIndex] || images[0]));
   };
 
   renderDialog();

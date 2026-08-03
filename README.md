@@ -3,17 +3,25 @@
 Sistema web para catálogo, productos, inventario, ventas, finanzas, usuarios y configuración.
 
 ## Versión
-0.8.3
+0.8.4
 
 ## Actualización requerida
-Antes de usar la edición de ventas, ejecutar en Supabase SQL Editor:
+Ejecutar en Supabase SQL Editor, en este orden si aún no fueron aplicados:
 
-`docs/02_edicion_ventas_v0.8.3.sql`
+1. `docs/02_edicion_ventas_v0.8.2.sql`
+2. `docs/03_colores_presentaciones_v0.8.4.sql`
 
-Autor: Codex + Daniel
+## v0.8.4 — Presentaciones y selector de colores
 
+- Agrupa las variantes por `codigo_modelo` sin unir productos que tengan el código vacío.
+- Muestra al cliente las presentaciones disponibles con color exterior e interior.
+- Permite elegir cada presentación y actualiza fotografías, descripción, SKU, precio y WhatsApp.
+- Añade paleta visual y entrada hexadecimal para exterior e interior.
+- En navegadores compatibles permite tomar un color directamente de la fotografía con `EyeDropper`.
+- Los colores surtidos usan una muestra multicolor y los colores sin hexadecimal ya no generan un círculo gris inventado.
+- Refuerza la carga pública para que un error no deje el catálogo detenido en “Cargando productos…”.
 
-## v0.8.3
+Más detalles en `docs/CAMBIOS_PRESENTACIONES_COLORES_v0.8.4.md`.
 
-- Inicio muestra la ganancia acumulada del negocio junto al saldo pendiente del proveedor.
-- Cabecera con identidad de usuario más clara: inicial, nombre y rol en líneas separadas.
+## Autor
+Codex + Daniel

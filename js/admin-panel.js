@@ -196,6 +196,49 @@ function applyRoleRestrictions() {
   }
 }
 
+function normalizeAdminHex(value, fallback = '') {
+  const hex = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(hex) ? hex.toUpperCase() : fallback;
+}
+
+function bindColorControl(form, type) {
+  const picker = form[`color_${type}_picker`];
+  const hex = form[`color_${type}_hex`];
+  const button = form.querySelector(`[data-eyedropper="${type}"]`);
+  if (!picker || !hex) return;
+
+  const syncFromPicker = () => { hex.value = picker.value.toUpperCase(); };
+  const syncFromHex = () => {
+    const valid = normalizeAdminHex(hex.value);
+    hex.setCustomValidity(hex.value && !valid ? 'Usa el formato #RRGGBB, por ejemplo #74D2E7.' : '');
+    if (valid) picker.value = valid;
+  };
+  picker.addEventListener('input', syncFromPicker);
+  hex.addEventListener('input', syncFromHex);
+  syncFromHex();
+
+  if (!button) return;
+  if (!('EyeDropper' in window)) {
+    button.hidden = true;
+    return;
+  }
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = 'Selecciona un punto…';
+    try {
+      const result = await new EyeDropper().open();
+      picker.value = result.sRGBHex;
+      syncFromPicker();
+    } catch (error) {
+      if (error?.name !== 'AbortError') console.error('No se pudo tomar el color:', error);
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
+}
+
 function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
   const thumbnail = firstImage || '../assets/logo.png';
@@ -258,8 +301,24 @@ function editor(p, i) {
               <div class="field-grid">
                 <label>SKU<input name="sku" class="sku-input locked-input" value="${attr(p.sku)}" readonly aria-readonly="true"><small>Identificador protegido; no se modifica.</small></label>
                 <label>Código de modelo<input name="codigo_modelo" value="${attr(p.codigo_modelo || '')}" required></label>
-                <label>Color de caja / presentación<input name="color_caja" value="${attr(p.color_caja || '')}" placeholder="Ej.: Azul"></label>
-                <label>Color interior<input name="color_interior" value="${attr(p.color_interior || '')}" placeholder="Ej.: Beige"><small>Déjalo vacío para ocultarlo en el catálogo.</small></label>
+                <div class="color-editor">
+                  <label>Color exterior / presentación<input name="color_caja" value="${attr(p.color_caja || '')}" placeholder="Ej.: Azul Tiffany"></label>
+                  <div class="color-picker-row">
+                    <label class="color-well">Muestra<input name="color_exterior_picker" type="color" value="${attr(normalizeAdminHex(p.color_exterior_hex, '#587991'))}" aria-label="Elegir color exterior"></label>
+                    <label>Hexadecimal<input name="color_exterior_hex" class="hex-input" value="${attr(normalizeAdminHex(p.color_exterior_hex, ''))}" placeholder="#74D2E7" maxlength="7" pattern="^#[0-9A-Fa-f]{6}$"></label>
+                    <button class="button secondary eyedropper-button" type="button" data-eyedropper="exterior">Tomar de la imagen</button>
+                  </div>
+                  <small>El nombre describe la variante y el hexadecimal controla la muestra visual.</small>
+                </div>
+                <div class="color-editor">
+                  <label>Color interior<input name="color_interior" value="${attr(p.color_interior || '')}" placeholder="Ej.: Beige"><small>Déjalo vacío para ocultarlo en el catálogo.</small></label>
+                  <div class="color-picker-row">
+                    <label class="color-well">Muestra<input name="color_interior_picker" type="color" value="${attr(normalizeAdminHex(p.color_interior_hex, '#d4c3a3'))}" aria-label="Elegir color interior"></label>
+                    <label>Hexadecimal<input name="color_interior_hex" class="hex-input" value="${attr(normalizeAdminHex(p.color_interior_hex, ''))}" placeholder="#DCCFB7" maxlength="7" pattern="^#[0-9A-Fa-f]{6}$"></label>
+                    <button class="button secondary eyedropper-button" type="button" data-eyedropper="interior">Tomar de la imagen</button>
+                  </div>
+                  <small>En navegadores compatibles podrás tomar el tono directamente de la fotografía visible.</small>
+                </div>
               </div>
             </section>
           </details>
@@ -291,6 +350,8 @@ function editor(p, i) {
 }
 function bindCard(card) {
   const form = card.querySelector('form');
+  bindColorControl(form, 'exterior');
+  bindColorControl(form, 'interior');
 
   const updateHeader = () => {
     const name = form.nombre.value.trim() || 'Producto sin nombre';
@@ -369,7 +430,7 @@ function bindCard(card) {
   form.multiplicador_mayorista.addEventListener('input', () => updatePriceFromMultiplier('mayorista'));
   form.multiplicador_minorista.addEventListener('input', () => updatePriceFromMultiplier('minorista'));
   form.stock.addEventListener('input', updateStock);
-  ['nombre','codigo_modelo','color_caja','color_interior','descripcion','detalle_distintivo'].forEach(name => form[name].addEventListener('input', updateHeader));
+  ['nombre','codigo_modelo','color_caja','color_interior','color_exterior_hex','color_interior_hex','descripcion','detalle_distintivo'].forEach(name => form[name].addEventListener('input', updateHeader));
   form.addEventListener('submit', e => save(e, card.dataset.sku));
   form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
   form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
@@ -396,7 +457,7 @@ async function save(event, sku) {
   try { images = images.concat(await uploadPhotos(fixedSku, [...form.photos.files], images.length)); }
   catch (e) { message.textContent = e.message; return; }
   const retailPrice = nullableNumber(form.precio_minorista.value);
-  const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), precio_minorista: retailPrice, imagenes: images, actualizado_en:new Date().toISOString() };
+  const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), precio_minorista: retailPrice, imagenes: images, actualizado_en:new Date().toISOString() };
   const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), actualizado_en:new Date().toISOString() };
   const [{ error: e1 }, { error: e2 }] = await Promise.all([db.from('productos_publicos').update(publicData).eq('sku', sku), db.from('inventario_privado').update(privateData).eq('sku', sku)]);
   if (e1 || e2) message.textContent = `No se guardó: ${(e1 || e2).message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }

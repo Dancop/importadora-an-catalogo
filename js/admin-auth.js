@@ -10,7 +10,7 @@ validación de sesión y recuperación ante errores.
 ===========================================
 */
 import { db } from './supabase-client.js';
-import { initializeAdminPanel } from './admin-panel.js';
+import { initializeAdminPanel } from './admin-panel.js?v=20260803-1';
 
 const loginView = document.querySelector('#login-view');
 const loginForm = document.querySelector('#login-form');

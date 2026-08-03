@@ -464,38 +464,24 @@
 .sales-detail-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.button.danger{background:#a53f3f;color:#fff;border-color:#a53f3f}
 @media(max-width:700px){.sales-edit-banner{align-items:stretch;flex-direction:column}.sales-detail-data{grid-template-columns:1fr 1fr}.sales-detail-actions{flex-direction:column}.sales-detail-actions .button{width:100%}}
 
-/* ==========================================================
-   Catálogo: colores y presentaciones visibles (v0.8.4)
-   ========================================================== */
-.product-image>.option-count{
-  position:absolute;
-  left:14px;
-  bottom:14px;
-  display:inline-flex;
-  align-items:center;
-  min-height:30px;
-  padding:5px 11px;
-  border:1px solid rgba(255,255,255,.72);
-  border-radius:999px;
-  background:rgba(7,29,45,.88);
-  color:#fff;
-  font-size:.74rem;
-  font-weight:800;
-  box-shadow:0 5px 16px rgba(7,29,45,.18);
-  backdrop-filter:blur(8px);
-}
-.product-options{display:grid;gap:7px;margin:4px 0 13px}
-.options-title{color:var(--muted);font-size:.75rem;font-weight:700}
-.color-chips{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.color-chip{display:inline-flex;align-items:center;gap:6px;min-height:29px;padding:4px 9px 4px 5px;border:1px solid var(--line);border-radius:999px;background:#fff;color:#42515c;font-size:.72rem;font-weight:700}
-.color-chip i{display:block;width:18px;height:18px;flex:0 0 18px;border:1px solid rgba(7,29,45,.18);border-radius:50%;background:var(--chip-color)}
-.color-more,.presentation-label{display:inline-flex;align-items:center;min-height:29px;padding:4px 9px;border-radius:999px;background:#edf2f5;color:var(--navy);font-size:.72rem;font-weight:800}
-.product-card .summary{margin-top:8px}
-.product-card .text-button{font-weight:700;white-space:nowrap}
-.variant-card-top strong:before{content:'';display:inline-block;width:13px;height:13px;margin-right:7px;border:1px solid rgba(7,29,45,.18);border-radius:50%;background:#d7dee3;vertical-align:-1px}
+/* Catálogo público: variantes y colores — v0.8.4 */
+.product-image>.availability{left:auto;right:14px}
+.options-count{position:absolute;left:14px;top:14px;display:inline-flex;align-items:center;min-height:28px;padding:5px 10px;border:1px solid rgba(255,255,255,.78);border-radius:999px;background:rgba(7,29,45,.86);backdrop-filter:blur(8px);color:#fff;font-size:.75rem;font-weight:800;box-shadow:0 4px 14px rgba(7,29,45,.14)}
+.product-presentations{display:grid;gap:7px;margin:12px 0 4px}
+.presentation-label{color:var(--muted);font-size:.76rem;font-weight:700}
+.presentation-chips{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.presentation-chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:4px 9px 4px 6px;border:1px solid var(--line);border-radius:999px;background:#fafbfb;color:#42515b;font-size:.76rem;font-weight:700;line-height:1}
+.color-dot{display:inline-block;flex:0 0 auto;width:14px;height:14px;border-radius:50%;background:var(--variant-color);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.color-dot.light{border:1px solid #aeb8be;box-shadow:none}
+.presentation-more{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 7px;border-radius:999px;background:#eaf0f3;color:var(--navy);font-size:.75rem;font-weight:800}
+.variant-name{display:inline-flex;align-items:center;gap:8px}
+.variant-card:disabled{cursor:not-allowed;opacity:.58;background:#f6f7f7}
+.variant-card:disabled:hover{border-color:var(--line);background:#f6f7f7}
 
-@media(max-width:760px){
-  .product-options{margin-bottom:11px}
-  .color-chip{font-size:.7rem}
-  .product-image>.option-count{left:12px;bottom:12px}
+@media(max-width:700px){
+  .product-presentations{margin-top:10px}
+  .presentation-chips{gap:6px}
+  .presentation-chip{font-size:.72rem;padding-right:8px}
+  .options-count{left:12px;top:12px}
+  .product-image>.availability{right:12px;top:12px}
 }

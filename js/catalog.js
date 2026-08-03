@@ -13,6 +13,30 @@ let showPrices = false;
 let companyName = 'Importadora A&N';
 let brandLogo = './assets/logo.png';
 
+const COLOR_MAP = {
+  negro: '#222222',
+  negra: '#222222',
+  rosa: '#e7a8b5',
+  rosado: '#e7a8b5',
+  rosada: '#e7a8b5',
+  azul: '#416b91',
+  cafe: '#795548',
+  marron: '#795548',
+  rojo: '#b84a4a',
+  roja: '#b84a4a',
+  blanco: '#ffffff',
+  blanca: '#ffffff',
+  gris: '#8a8f98',
+  dorado: '#c6a15b',
+  dorada: '#c6a15b',
+  plateado: '#aeb4ba',
+  plateada: '#aeb4ba',
+  lila: '#a88bc1',
+  morado: '#74558f',
+  morada: '#74558f',
+  verde: '#618568'
+};
+
 function applyBrand() {
   document.querySelectorAll('[data-brand-name]').forEach(el => el.textContent = companyName);
   document.querySelectorAll('[data-brand-logo]').forEach(el => el.src = brandLogo);
@@ -23,94 +47,131 @@ function applyBrand() {
 const money = value => value == null ? 'Consultar precio' : `Bs ${Number(value).toLocaleString('es-BO', { maximumFractionDigits: 2 })}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 
-const COLOR_STYLES = {
-  negro: '#1f2933', negra: '#1f2933',
-  blanco: '#f8fafc', blanca: '#f8fafc',
-  rosa: '#e9a5b5', rosado: '#e9a5b5', rosada: '#e9a5b5',
-  azul: '#4f78a8', celeste: '#79b7d3',
-  cafe: '#8a6548', café: '#8a6548', marron: '#8a6548', marrón: '#8a6548',
-  rojo: '#b84045', roja: '#b84045',
-  verde: '#4f8663', lila: '#9b83bd', morado: '#76558f', morada: '#76558f',
-  dorado: '#c5a45b', dorada: '#c5a45b', plateado: '#aeb7c1', plateada: '#aeb7c1',
-  beige: '#d6c2a3', crema: '#eadfc8', gris: '#8b949e'
-};
-
-function normalizeText(value = '') {
-  return String(value).trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function normalizeText(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
-function productDisplayName(product) {
-  let name = String(product.nombre || '').trim();
-  const colors = product.variants.map(v => v.color_caja).filter(Boolean).sort((a, b) => String(b).length - String(a).length);
-  for (const color of colors) {
-    const escaped = String(color).replace(/[.*+?^${}()|[\]\]/g, '\$&');
-    name = name.replace(new RegExp(`\s*[-–—|/]?\s*${escaped}\s*$`, 'i'), '').trim();
-  }
-  return name || product.nombre || 'Producto';
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function variantColors(product) {
+function publicProductName(name, color) {
+  const cleanName = String(name ?? '').trim();
+  const cleanColor = String(color ?? '').trim();
+  if (!cleanName || !cleanColor) return cleanName;
+
+  const colorAtEnd = new RegExp(`\\s+${escapeRegExp(cleanColor)}\\s*$`, 'i');
+  const result = cleanName.replace(colorAtEnd, '').trim();
+  return result || cleanName;
+}
+
+function visualColor(name) {
+  return COLOR_MAP[normalizeText(name)] || '#d4d7db';
+}
+
+function uniquePresentations(variants) {
   const seen = new Set();
-  return product.variants.map(v => String(v.color_caja || '').trim()).filter(color => {
-    if (!color) return false;
-    const key = normalizeText(color);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function colorValue(color) {
-  return COLOR_STYLES[normalizeText(color)] || '#d7dee3';
-}
-
-function colorChips(product, compact = false) {
-  const colors = variantColors(product);
-  if (!colors.length) return '<span class="presentation-label">Varias presentaciones</span>';
-  const visible = compact ? colors.slice(0, 5) : colors;
-  const remaining = colors.length - visible.length;
-  return `${visible.map(color => `<span class="color-chip" title="${escapeHtml(color)}"><i style="--chip-color:${escapeHtml(colorValue(color))}"></i><span>${escapeHtml(color)}</span></span>`).join('')}${remaining > 0 ? `<span class="color-more">+${remaining}</span>` : ''}`;
+  return variants
+    .map(variant => String(variant.color_caja || '').trim())
+    .filter(label => {
+      const key = normalizeText(label);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 function groupProducts(rows) {
   const map = new Map();
-  rows.filter(row => row.disponible !== false).forEach(row => {
-    if (!map.has(row.codigo_modelo)) map.set(row.codigo_modelo, { ...row, variants: [] });
-    map.get(row.codigo_modelo).variants.push(row);
+
+  rows.filter(row => row.disponible !== false).forEach((row, index) => {
+    const modelCode = String(row.codigo_modelo || '').trim();
+    const fallback = String(row.sku || row.id || `fila-${index}`).trim();
+    const groupKey = modelCode ? `modelo:${modelCode}` : `variante:${fallback}`;
+
+    if (!map.has(groupKey)) {
+      map.set(groupKey, {
+        ...row,
+        groupKey,
+        codigo_modelo: modelCode || fallback,
+        variants: []
+      });
+    }
+    map.get(groupKey).variants.push(row);
   });
-  return [...map.values()];
+
+  return [...map.values()].map(product => ({
+    ...product,
+    publicName: publicProductName(product.nombre, product.color_caja),
+    presentations: uniquePresentations(product.variants)
+  }));
 }
 
 function cover(product) {
   const image = product.variants.flatMap(v => v.imagenes || [])[0];
   return image
-    ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.nombre)}" loading="lazy">`
+    ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.publicName)}" loading="lazy">`
     : `<div class="image-placeholder"><img src="${escapeHtml(brandLogo)}" alt=""><span>Fotografía próximamente</span></div>`;
 }
 
+function colorDot(label) {
+  const value = visualColor(label);
+  const light = ['#ffffff', '#d4d7db'].includes(value);
+  return `<span class="color-dot${light ? ' light' : ''}" style="--variant-color:${escapeHtml(value)}" aria-hidden="true"></span>`;
+}
+
+function presentationChips(product) {
+  const labels = product.presentations;
+  if (!labels.length) return '';
+  const visible = labels.slice(0, 4);
+  const remaining = labels.length - visible.length;
+  return `<div class="product-presentations" aria-label="Colores disponibles">
+    <span class="presentation-label">Colores disponibles</span>
+    <div class="presentation-chips">${visible.map(label => `<span class="presentation-chip">${colorDot(label)}<span>${escapeHtml(label)}</span></span>`).join('')}${remaining > 0 ? `<span class="presentation-more">+${remaining}</span>` : ''}</div>
+  </div>`;
+}
+
+function priceLabel(product) {
+  if (!showPrices) return 'Consultar por WhatsApp';
+  const prices = product.variants
+    .map(v => Number(v.precio_minorista))
+    .filter(Number.isFinite);
+  if (!prices.length) return 'Consultar precio';
+
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  return minimum === maximum ? money(minimum) : `Desde ${money(minimum)}`;
+}
+
 function card(product) {
-  const available = product.variants.some(v => v.disponible);
-  const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
-  const price = showPrices && prices.length ? money(Math.min(...prices)) : 'Consultar por WhatsApp';
-  const colors = variantColors(product);
-  const optionCount = colors.length || product.variants.length;
-  const optionLabel = optionCount === 1 ? '1 presentación' : `${optionCount} opciones`;
-  const actionLabel = optionCount > 1 ? 'Elegir opción →' : 'Ver detalles →';
-  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}">
+  const available = product.variants.some(v => v.disponible !== false);
+  const optionCount = product.presentations.length;
+  const optionBadge = optionCount > 1 ? `<span class="options-count">${optionCount} colores</span>` : '';
+  const actionLabel = optionCount > 1 ? 'Elegir color →' : 'Ver detalles →';
+
+  return `<article class="product-card" data-group-key="${escapeHtml(product.groupKey)}">
     <div class="product-image">${cover(product)}
       <span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span>
-      ${optionCount > 1 ? `<span class="option-count">${escapeHtml(optionLabel)}</span>` : ''}
+      ${optionBadge}
     </div>
-    <div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(productDisplayName(product))}</h3>
-    <div class="product-options" aria-label="Colores disponibles"><span class="options-title">${colors.length ? 'Colores disponibles' : 'Presentaciones disponibles'}</span><div class="color-chips">${colorChips(product, true)}</div></div>
-    <p class="summary">${escapeHtml(product.descripcion)}</p><div class="card-bottom"><strong>${price}</strong><button class="text-button" type="button">${actionLabel}</button></div></div>
+    <div class="product-info">
+      <p class="category">${escapeHtml(product.categoria)}</p>
+      <h3>${escapeHtml(product.publicName)}</h3>
+      ${presentationChips(product)}
+      <p class="summary">${escapeHtml(product.descripcion)}</p>
+      <div class="card-bottom"><strong>${priceLabel(product)}</strong><button class="text-button" type="button">${actionLabel}</button></div>
+    </div>
   </article>`;
 }
 
 function render(filter = 'Todos') {
   const visible = filter === 'Todos' ? groups : groups.filter(p => p.categoria === filter);
   grid.innerHTML = visible.map(card).join('');
-  grid.querySelectorAll('.product-card').forEach(cardEl => cardEl.addEventListener('click', () => openProduct(cardEl.dataset.code)));
+  grid.querySelectorAll('.product-card').forEach(cardEl => cardEl.addEventListener('click', () => openProduct(cardEl.dataset.groupKey)));
 }
 
 function variantImages(variant, product) {
@@ -132,28 +193,36 @@ function galleryMarkup(images, productName) {
 
 function variantMarkup(v, index, selectedIndex) {
   const title = v.color_caja || 'Presentación';
-  return `<button type="button" class="variant-card${index === selectedIndex ? ' active' : ''}" data-variant-index="${index}">
-    <span class="variant-card-top"><strong>${escapeHtml(title)}</strong>${v.color_interior ? `<small>Interior ${escapeHtml(v.color_interior)}</small>` : ''}</span>
+  const unavailable = v.disponible === false;
+  return `<button type="button" class="variant-card${index === selectedIndex ? ' active' : ''}" data-variant-index="${index}" ${unavailable ? 'disabled aria-disabled="true"' : ''}>
+    <span class="variant-card-top"><strong class="variant-name">${colorDot(title)}${escapeHtml(title)}</strong>${v.color_interior ? `<small>Interior ${escapeHtml(v.color_interior)}</small>` : ''}</span>
     <span class="variant-description">${escapeHtml(v.detalle_distintivo || '')}</span>
-    <span class="variant-footer"><span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span><strong>${showPrices ? money(v.precio_minorista) : 'Consultar por WhatsApp'}</strong></span>
+    <span class="variant-footer"><span class="availability ${unavailable ? 'out' : ''}">${unavailable ? 'Agotado' : 'Disponible'}</span><strong>${showPrices ? money(v.precio_minorista) : 'Consultar por WhatsApp'}</strong></span>
   </button>`;
 }
 
-function openProduct(code) {
-  const product = groups.find(p => p.codigo_modelo === code);
+function initialVariantIndex(product) {
+  const availableWithImage = product.variants.findIndex(v => v.disponible !== false && (v.imagenes || []).length);
+  if (availableWithImage >= 0) return availableWithImage;
+  const available = product.variants.findIndex(v => v.disponible !== false);
+  return available >= 0 ? available : 0;
+}
+
+function openProduct(groupKey) {
+  const product = groups.find(p => p.groupKey === groupKey);
   if (!product) return;
-  let selectedIndex = Math.max(0, product.variants.findIndex(v => (v.imagenes || []).length));
+  let selectedIndex = initialVariantIndex(product);
   let galleryIndex = 0;
 
   const renderDialog = () => {
     const selected = product.variants[selectedIndex];
     const images = variantImages(selected, product);
-    content.innerHTML = `<div class="dialog-gallery" data-dialog-gallery>${galleryMarkup(images, productDisplayName(product))}</div>
+    content.innerHTML = `<div class="dialog-gallery" data-dialog-gallery>${galleryMarkup(images, product.publicName)}</div>
       <div class="dialog-details">
         <p class="eyebrow">${escapeHtml(product.categoria)}</p>
-        <h2>${escapeHtml(productDisplayName(product))}</h2>
+        <h2>${escapeHtml(product.publicName)}</h2>
         <p>${escapeHtml(product.descripcion)}</p>
-        <div class="presentation-heading"><div><h3>Elige un color o presentación</h3><p>Selecciona una opción para cambiar las fotografías, disponibilidad y código.</p></div></div>
+        <div class="presentation-heading"><div><h3>Elige un color o presentación</h3><p>La fotografía, el precio y el código se actualizan según tu elección.</p></div></div>
         <div class="variants">${product.variants.map((v, index) => variantMarkup(v, index, selectedIndex)).join('')}</div>
         <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" data-variant-whatsapp>Consultar por WhatsApp</a><button id="share-product" class="button secondary" type="button">Compartir</button></div>
       </div>`;
@@ -190,7 +259,7 @@ function openProduct(code) {
     }));
 
     const selectedLabel = selected.color_caja || 'Presentación';
-    const whatsappText = `Hola, quisiera consultar por ${productDisplayName(product)}, presentación ${selectedLabel} (${selected.sku}).`;
+    const whatsappText = `Hola, quisiera consultar por ${product.publicName}, presentación ${selectedLabel} (${selected.sku || product.codigo_modelo}).`;
     content.querySelector('[data-variant-whatsapp]').href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(whatsappText)}`;
     content.querySelector('#share-product').addEventListener('click', () => shareProduct(product, selected, images[galleryIndex] || images[0]));
   };
@@ -204,7 +273,7 @@ async function shareProduct(product, variant, imageUrl) {
   const available = variant.disponible ? 'Disponible' : 'Agotado';
   const presentation = [variant.color_caja ? `Caja ${variant.color_caja}` : '', variant.color_interior ? `interior ${variant.color_interior}` : ''].filter(Boolean).join(', ');
   const text = applyTemplate(shareTemplate, {
-    nombre: productDisplayName(product),
+    nombre: product.publicName,
     descripcion: product.descripcion,
     detalle: [presentation, variant.detalle_distintivo].filter(Boolean).join('\n'),
     precio: priceText,
@@ -217,10 +286,10 @@ async function shareProduct(product, variant, imageUrl) {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
       const extension = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
-      const safeName = productDisplayName(product).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+      const safeName = product.publicName.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
       const file = new File([blob], `${safeName}.${extension}`, { type: blob.type || 'image/jpeg' });
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ title: productDisplayName(product), text, files: [file] });
+        await navigator.share({ title: product.publicName, text, files: [file] });
         return;
       }
     } catch (error) {
@@ -228,7 +297,7 @@ async function shareProduct(product, variant, imageUrl) {
     }
   }
   if (navigator.share) {
-    try { await navigator.share({ title: productDisplayName(product), text }); return; }
+    try { await navigator.share({ title: product.publicName, text }); return; }
     catch (error) { if (error?.name === 'AbortError') return; }
   }
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
@@ -246,16 +315,39 @@ document.querySelectorAll('.filter').forEach(button => button.addEventListener('
 }));
 
 async function load() {
-  const [{ data, error }, { data: config }] = await Promise.all([
-    db.from('productos_publicos').select('*').order('orden'),
-    db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id', 'catalogo').single()
-  ]);
-  if (error) { status.textContent = 'No pudimos cargar el catálogo. Intenta nuevamente.'; return; }
-  shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;
-  showPrices = config?.mostrar_precios === true;
-  companyName = config?.nombre_empresa?.trim() || 'Importadora A&N';
-  brandLogo = config?.logo_url || './assets/logo.png';
-  applyBrand();
-  groups = groupProducts(data); status.hidden = true; render();
+  status.hidden = false;
+  status.textContent = 'Cargando productos…';
+
+  try {
+    const [productsResult, configResult] = await Promise.all([
+      db.from('productos_publicos').select('*').order('orden'),
+      db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id', 'catalogo').single()
+    ]);
+
+    if (productsResult.error) throw productsResult.error;
+
+    const config = configResult.data;
+    shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;
+    showPrices = config?.mostrar_precios === true;
+    companyName = config?.nombre_empresa?.trim() || 'Importadora A&N';
+    brandLogo = config?.logo_url || './assets/logo.png';
+    applyBrand();
+
+    groups = groupProducts(productsResult.data || []);
+    render();
+
+    if (!groups.length) {
+      status.textContent = 'No hay productos disponibles en este momento.';
+      status.hidden = false;
+    }
+  } catch (error) {
+    console.error('Error al cargar el catálogo:', error);
+    grid.innerHTML = '';
+    status.textContent = 'No pudimos cargar el catálogo. Actualiza la página para intentar nuevamente.';
+    status.hidden = false;
+  } finally {
+    if (groups.length) status.hidden = true;
+  }
 }
+
 load();

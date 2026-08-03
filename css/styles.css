@@ -635,3 +635,30 @@
   .gallery-arrow{display:grid}
   .dialog-product-heading h2{font-size:1.25rem}
 }
+
+
+/* ==========================================================
+   Mejoras v0.8.7: portada por modelo y acceso móvil al catálogo
+   ========================================================== */
+.view-catalog-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.view-catalog-button span{font-size:1rem;line-height:1}
+.existing-cover-picker{display:grid;gap:10px;padding:14px;border:1px solid var(--line);border-radius:14px;background:#f7f9fa}
+.existing-cover-heading{display:grid;gap:2px}.existing-cover-heading small{color:var(--muted)}
+.existing-cover-options{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity}
+.existing-cover-option{position:relative;display:grid;flex:0 0 104px;gap:4px;padding:6px;border:2px solid transparent;border-radius:12px;background:#fff;cursor:pointer;scroll-snap-align:start;box-shadow:0 2px 8px rgba(7,29,45,.06)}
+.existing-cover-option input{position:absolute;opacity:0;pointer-events:none}
+.existing-cover-option img{width:100%;aspect-ratio:1/1;border-radius:8px;object-fit:cover;background:#eef2f4}
+.existing-cover-option span,.existing-cover-option small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.existing-cover-option span{font-size:.75rem;font-weight:800;color:var(--navy)}
+.existing-cover-option small{font-size:.65rem;color:var(--muted)}
+.existing-cover-option.selected{border-color:var(--navy);box-shadow:0 0 0 3px rgba(7,29,45,.1)}
+.existing-cover-option.selected:after{content:'★';position:absolute;top:9px;right:9px;display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:var(--navy);color:#fff;font-size:.72rem}
+.empty-cover-options{margin:0;color:var(--muted);font-size:.82rem}
+@media(max-width:820px){
+  .header-actions{display:flex!important;flex-direction:row!important;align-items:center;gap:7px}
+  .header-actions a.view-catalog-button{display:inline-flex!important;min-height:40px;padding:8px 10px!important}
+  .view-catalog-button b{display:none}
+  .view-catalog-button span{font-size:1.15rem}
+  .header-actions #logout{min-height:40px}
+  .existing-cover-option{flex-basis:92px}
+}

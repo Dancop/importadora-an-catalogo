@@ -1,7 +1,7 @@
 export const ADMIN_PANEL_HTML = `<section id="admin-view" class="admin-view admin-app">
       <header class="admin-header app-topbar">
         <div class="app-title-group"><img id="admin-header-logo" class="admin-header-logo" src="../assets/logo.png" alt=""><div><p id="admin-company-name" class="eyebrow">Importadora A&amp;N</p><h1 id="admin-title">Inicio</h1></div></div>
-        <div class="header-actions"><div id="current-user-badge" class="user-profile" aria-label="Usuario actual"><span id="current-user-avatar" class="user-profile-avatar" aria-hidden="true">U</span><span class="user-profile-copy"><strong id="current-user-name">Usuario</strong><small id="current-user-role">Rol</small></span></div><a class="button secondary" href="../" target="_blank" rel="noopener">Ver catálogo</a><button id="logout" class="button secondary">Salir</button></div>
+        <div class="header-actions"><div id="current-user-badge" class="user-profile" aria-label="Usuario actual"><span id="current-user-avatar" class="user-profile-avatar" aria-hidden="true">U</span><span class="user-profile-copy"><strong id="current-user-name">Usuario</strong><small id="current-user-role">Rol</small></span></div><a class="button secondary view-catalog-button" href="../" target="_blank" rel="noopener" aria-label="Abrir catálogo público"><span aria-hidden="true">↗</span><b>Ver catálogo</b></a><button id="logout" class="button secondary">Salir</button></div>
       </header>
       <nav id="admin-menu" class="admin-menu app-sidebar" aria-label="Menú de administración">
         <div class="sidebar-brand"><img id="admin-sidebar-logo" src="../assets/logo.png" alt=""><span><strong id="admin-sidebar-company">Importadora A&amp;N</strong><small>Centro de gestión</small></span></div>

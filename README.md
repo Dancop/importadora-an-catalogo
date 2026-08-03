@@ -50,3 +50,12 @@ Más detalles en `docs/UX_PRESENTACIONES_v0.8.5.md`.
 
 ## Autor
 Codex + Daniel
+
+## Novedades de v0.8.7
+
+- El catálogo público muestra **“Incluye X artículos”** en lugar de “Piezas”, para no confundir la composición del set con el stock.
+- La portada puede seleccionarse desde las fotografías ya subidas de todas las presentaciones que comparten el mismo `codigo_modelo`.
+- También se mantiene la posibilidad de subir una portada nueva cuando se desea una fotografía general del modelo.
+- La portada seleccionada se comparte entre todas las variantes del modelo y tiene prioridad sobre la imagen automática de respaldo.
+- En el panel administrativo móvil vuelve a estar visible el acceso directo al catálogo público.
+- Esta versión no requiere ejecutar SQL adicional si la actualización de v0.8.6 ya fue aplicada.

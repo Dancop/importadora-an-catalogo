@@ -3,8 +3,8 @@
 Importadora A&N
 Módulo: Panel administrativo
 Autor: Codex + Daniel
-Versión: 0.8.0
-Última modificación: 2026-07-28
+Versión: 0.8.7
+Última modificación: 2026-08-03
 Descripción: Navegación, productos, configuración,
 rentabilidad y conexión con el dashboard.
 ===========================================
@@ -28,6 +28,7 @@ let catalogConfig = { nombre_empresa:'Importadora A&N', mostrar_precios:false, m
 let profitabilityRows = [];
 let productsLoaded = false;
 let productsLoading = null;
+let publicProducts = [];
 
 document.querySelector('#logout').addEventListener('click', async () => { await db.auth.signOut(); location.reload(); });
 
@@ -164,6 +165,7 @@ async function loadProducts() {
   document.querySelector('#admin-sidebar-logo').src = catalogConfig.logo_url || '../assets/logo.png';
   document.querySelector('#share-template').value = shareTemplate;
   updateTemplatePreview();
+  publicProducts = products || [];
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
   profitabilityRows = products.map(p => buildProfitabilityRow(p, privateMap.get(p.sku) || {}));
   renderProfitability();
@@ -239,9 +241,33 @@ function bindColorControl(form, type) {
   });
 }
 
+function getModelImageOptions(product) {
+  const modelCode = String(product.codigo_modelo || '').trim();
+  const related = modelCode
+    ? publicProducts.filter(item => String(item.codigo_modelo || '').trim() === modelCode)
+    : [product];
+  const seen = new Set();
+  const options = [];
+  related.forEach(item => {
+    (item.imagenes || []).forEach((url, index) => {
+      const cleanUrl = String(url || '').trim();
+      if (!cleanUrl || seen.has(cleanUrl)) return;
+      seen.add(cleanUrl);
+      const exterior = String(item.color_caja || '').replace(/^caja\s+/i, '').trim();
+      options.push({
+        url: cleanUrl,
+        label: exterior || item.sku || `Imagen ${index + 1}`,
+        sku: item.sku || ''
+      });
+    });
+  });
+  return options;
+}
+
 function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
   const coverImage = p.imagen_portada || '';
+  const modelImageOptions = getModelImageOptions(p);
   const thumbnail = firstImage || coverImage || '../assets/logo.png';
   const stock = Number(i.stock || 0);
   const baseValue = i.precio_base ?? '';
@@ -342,7 +368,13 @@ function editor(p, i) {
                   <img src="${attr(coverImage || thumbnail)}" alt="Portada actual del modelo" data-cover-preview>
                   <div><strong>Imagen de portada del modelo</strong><small>Debe mostrar claramente todas las presentaciones. Se comparte entre los productos con el mismo código de modelo.</small></div>
                 </div>
-                <label>Seleccionar nueva portada<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+                <div class="existing-cover-picker">
+                  <div class="existing-cover-heading"><strong>Elegir de las imágenes ya subidas</strong><small>Selecciona una fotografía del modelo sin volver a cargarla.</small></div>
+                  <div class="existing-cover-options" role="radiogroup" aria-label="Imágenes disponibles para portada">
+                    ${modelImageOptions.length ? modelImageOptions.map((option, optionIndex) => `<label class="existing-cover-option ${coverImage === option.url ? 'selected' : ''}"><input type="radio" name="existing_cover" value="${attr(option.url)}" ${coverImage === option.url ? 'checked' : ''}><img src="${attr(option.url)}" alt="${attr(option.label)}"><span>${text(option.label)}</span><small>${text(option.sku)}</small></label>`).join('') : '<p class="empty-cover-options">Todavía no hay fotografías disponibles en este modelo.</p>'}
+                  </div>
+                </div>
+                <label>O subir una portada nueva<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
                 <input name="imagen_portada_actual" type="hidden" value="${attr(coverImage)}">
               </div>
               <label>Agregar fotografías de esta presentación<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
@@ -361,11 +393,26 @@ function bindCard(card) {
   const form = card.querySelector('form');
   bindColorControl(form, 'exterior');
   bindColorControl(form, 'interior');
+  form.querySelectorAll('input[name="existing_cover"]').forEach(input => {
+    input.addEventListener('change', () => {
+      if (!input.checked) return;
+      form.imagen_portada_actual.value = input.value;
+      const preview = form.querySelector('[data-cover-preview]');
+      if (preview) preview.src = input.value;
+      form.querySelectorAll('.existing-cover-option').forEach(option => {
+        option.classList.toggle('selected', option.contains(input));
+      });
+      if (form.cover_photo) form.cover_photo.value = '';
+    });
+  });
+
   form.cover_photo?.addEventListener('change', event => {
     const file = event.target.files?.[0];
     if (!file) return;
     const preview = form.querySelector('[data-cover-preview]');
     if (preview) preview.src = URL.createObjectURL(file);
+    form.querySelectorAll('input[name="existing_cover"]').forEach(input => { input.checked = false; });
+    form.querySelectorAll('.existing-cover-option').forEach(option => option.classList.remove('selected'));
   });
 
   const updateHeader = () => {

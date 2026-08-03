@@ -23,36 +23,44 @@ function applyBrand() {
 const money = value => value == null ? 'Consultar precio' : `Bs ${Number(value).toLocaleString('es-BO', { maximumFractionDigits: 2 })}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 
+function parseImages(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === 'string') {
+    try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed.filter(Boolean) : []; }
+    catch { return value ? [value] : []; }
+  }
+  return [];
+}
+
 function groupProducts(rows) {
   const map = new Map();
-  rows.filter(row => row.disponible !== false).forEach((row, index) => {
+  rows.filter(row => row.disponible !== false).forEach((raw, index) => {
+    const row = { ...raw, imagenes: parseImages(raw.imagenes) };
     const code = String(row.codigo_modelo || '').trim();
     const fallback = String(row.sku || row.id || `producto-${index}`).trim();
     const key = code || fallback;
-    if (!map.has(key)) map.set(key, { ...row, codigo_modelo: key, variants: [] });
-    map.get(key).variants.push(row);
+    if (!map.has(key)) map.set(key, { ...row, codigo_modelo: key, variants: [], imagen_portada: row.imagen_portada || null });
+    const group = map.get(key);
+    if (!group.imagen_portada && row.imagen_portada) group.imagen_portada = row.imagen_portada;
+    group.variants.push(row);
   });
   return [...map.values()];
-}
-
-function normalizedHex(value, fallback = '#d4d7db') {
-  const hex = String(value || '').trim();
-  return /^#[0-9a-f]{6}$/i.test(hex) ? hex.toUpperCase() : fallback;
 }
 
 function presentationLabel(variant) {
   const exterior = String(variant.color_caja || '').replace(/^caja\s+/i, '').trim();
   const interior = String(variant.color_interior || '').trim();
-  return [exterior, interior ? `interior ${interior}` : ''].filter(Boolean).join(' / ') || 'Presentación';
+  return [exterior, interior].filter(Boolean).join(' / ') || 'Presentación';
+}
+
+function shortPresentationLabel(variant) {
+  return String(variant.color_caja || '').replace(/^caja\s+/i, '').trim() || 'Opción';
 }
 
 function productDisplayName(product) {
   const name = String(product?.nombre || '').trim();
   if (!name) return 'Producto';
-  const colors = (product?.variants || [])
-    .map(v => String(v.color_caja || '').replace(/^caja\s+/i, '').trim())
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length);
+  const colors = (product?.variants || []).map(v => String(v.color_caja || '').replace(/^caja\s+/i, '').trim()).filter(Boolean).sort((a,b) => b.length-a.length);
   for (const color of colors) {
     const escaped = color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const result = name.replace(new RegExp(`\\s+${escaped}\\s*$`, 'i'), '').trim();
@@ -61,40 +69,19 @@ function productDisplayName(product) {
   return name;
 }
 
-function variantThumbnail(variant, product) {
-  const image = variantImages(variant, product)[0];
-  return image
-    ? `<img class="variant-thumb" src="${escapeHtml(image)}" alt="${escapeHtml(presentationLabel(variant))}" loading="lazy">`
-    : `<span class="variant-thumb variant-thumb-placeholder" aria-hidden="true">◫</span>`;
+function variantImages(variant, product) {
+  const own = parseImages(variant?.imagenes);
+  if (own.length) return own;
+  return product.variants.flatMap(v => parseImages(v.imagenes));
 }
 
-function colorDot(hex, label, extraClass = '') {
-  const validHex = /^#[0-9a-f]{6}$/i.test(String(hex || '').trim());
-  const isAssorted = /surtid|variad|multicolor/i.test(String(label || ''));
-  const dot = validHex
-    ? `<span class="color-dot ${extraClass}" style="--swatch:${escapeHtml(normalizedHex(hex))}" aria-hidden="true"></span>`
-    : isAssorted
-      ? `<span class="color-dot assorted ${extraClass}" aria-hidden="true"></span>`
-      : '';
-  return `${dot}<span>${escapeHtml(label)}</span>`;
-}
-
-function presentationChips(product, limit = 4) {
-  const variants = product.variants.filter(v => v.color_caja || v.color_interior);
-  const shown = variants.slice(0, limit);
-  if (!shown.length) return '';
-  const remaining = variants.length - shown.length;
-  return `<div class="presentation-preview"><span class="presentation-preview-title">Presentaciones disponibles</span><div class="presentation-chips">${shown.map(v => {
-    const label = presentationLabel(v);
-    return `<span class="presentation-chip">${colorDot(v.color_exterior_hex, label)}</span>`;
-  }).join('')}${remaining > 0 ? `<span class="presentation-more">+${remaining}</span>` : ''}</div></div>`;
+function productCover(product) {
+  return product.imagen_portada || product.variants.flatMap(v => parseImages(v.imagenes))[0] || '';
 }
 
 function cover(product) {
-  const image = product.variants.flatMap(v => v.imagenes || [])[0];
-  return image
-    ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.nombre)}" loading="lazy">`
-    : `<div class="image-placeholder"><img src="${escapeHtml(brandLogo)}" alt=""><span>Fotografía próximamente</span></div>`;
+  const image = productCover(product);
+  return image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(productDisplayName(product))}" loading="lazy">` : `<div class="image-placeholder"><img src="${escapeHtml(brandLogo)}" alt=""><span>Fotografía próximamente</span></div>`;
 }
 
 function card(product) {
@@ -106,155 +93,97 @@ function card(product) {
   const bottom = showPrices
     ? `<div class="card-bottom"><strong>${prices.length ? money(Math.min(...prices)) : 'Consultar precio'}</strong><button class="text-button" type="button">${action}</button></div>`
     : `<div class="card-bottom price-hidden"><button class="text-button catalog-cta" type="button">${action}</button></div>`;
-  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}">
-    <div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span>${countBadge}</div>
-    <div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(displayName)}</h3>
-    ${presentationChips(product)}
-    <p class="summary">${escapeHtml(product.descripcion)}</p>${bottom}</div>
-  </article>`;
+  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}"><div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span>${countBadge}</div><div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(displayName)}</h3><p class="summary">${escapeHtml(product.descripcion)}</p>${bottom}</div></article>`;
 }
 
 function render(filter = 'Todos') {
   const visible = filter === 'Todos' ? groups : groups.filter(p => p.categoria === filter);
   grid.innerHTML = visible.map(card).join('');
-  grid.querySelectorAll('.product-card').forEach(cardEl => cardEl.addEventListener('click', () => openProduct(cardEl.dataset.code)));
+  grid.querySelectorAll('.product-card').forEach(el => el.addEventListener('click', () => openProduct(el.dataset.code)));
 }
 
-function variantImages(variant, product) {
-  const own = (variant.imagenes || []).filter(Boolean);
-  if (own.length) return own;
-  return product.variants.flatMap(v => v.imagenes || []).filter(Boolean);
+function visualItems(product) {
+  const items = [];
+  const coverUrl = productCover(product);
+  if (coverUrl) items.push({ type:'cover', url:coverUrl, label:'Portada', variantIndex:null });
+  product.variants.forEach((variant, variantIndex) => {
+    const url = variantImages(variant, product)[0];
+    if (url) items.push({ type:'variant', url, label:shortPresentationLabel(variant), variantIndex });
+  });
+  if (!items.length) items.push({ type:'cover', url:brandLogo, label:'Portada', variantIndex:null });
+  return items;
 }
 
-function galleryMarkup(images, productName) {
-  const list = images.length ? images : [brandLogo];
+function galleryMarkup(items, activeVisualIndex, productName) {
+  const active = items[activeVisualIndex] || items[0];
   return `<div class="gallery-stage">
-      <button class="gallery-arrow gallery-prev" type="button" aria-label="Fotografía anterior">‹</button>
-      <div class="gallery-track">${list.map((url, index) => `<figure class="gallery-slide${index === 0 ? ' active' : ''}" data-gallery-index="${index}"><img src="${escapeHtml(url)}" alt="${escapeHtml(productName)} - fotografía ${index + 1}"></figure>`).join('')}</div>
-      <button class="gallery-arrow gallery-next" type="button" aria-label="Fotografía siguiente">›</button>
-    </div>
-    <div class="gallery-thumbs" aria-label="Seleccionar fotografía">${list.map((url, index) => `<button type="button" class="gallery-thumb${index === 0 ? ' active' : ''}" data-gallery-go="${index}" aria-label="Ver fotografía ${index + 1}"><img src="${escapeHtml(url)}" alt=""></button>`).join('')}</div>
-    <p class="gallery-counter"><span data-gallery-current>1</span> de <span data-gallery-total>${list.length}</span></p>`;
-}
-
-function variantMarkup(v, index, selectedIndex, product) {
-  const exterior = String(v.color_caja || '').replace(/^caja\s+/i, '').trim() || 'Sin especificar';
-  const interior = String(v.color_interior || '').trim();
-  const label = [exterior, interior].filter(Boolean).join(' / ');
-  const priceMarkup = showPrices && v.precio_minorista != null
-    ? `<strong class="variant-price">${money(v.precio_minorista)}</strong>`
-    : '';
-  return `<button type="button" class="variant-card${index === selectedIndex ? ' active' : ''}" data-variant-index="${index}" ${v.disponible ? '' : 'disabled'} aria-pressed="${index === selectedIndex}">
-    ${variantThumbnail(v, product)}
-    <span class="variant-card-copy">
-      <strong class="variant-name">${escapeHtml(label || 'Presentación')}</strong>
-      <span class="variant-color-summary">
-        ${colorDot(v.color_exterior_hex, exterior, 'exterior')}
-        ${interior ? `<span class="variant-interior">/ ${colorDot(v.color_interior_hex, interior, 'interior')}</span>` : ''}
-      </span>
-      <span class="availability ${v.disponible ? '' : 'out'}">${v.disponible ? 'Disponible' : 'Agotado'}</span>
-    </span>
-    ${priceMarkup}
-    <span class="variant-selected-mark" aria-hidden="true">✓</span>
-  </button>`;
+    <button class="gallery-arrow gallery-prev" type="button" aria-label="Imagen anterior">‹</button>
+    <img class="gallery-main-image" src="${escapeHtml(active.url)}" alt="${escapeHtml(productName)}">
+    <button class="gallery-arrow gallery-next" type="button" aria-label="Imagen siguiente">›</button>
+    <span class="gallery-image-counter"><span data-gallery-current>${activeVisualIndex + 1}</span>/${items.length}</span>
+  </div>
+  <div class="visual-selector" aria-label="Portada y presentaciones">
+    ${items.map((item,index) => `<button type="button" class="visual-thumb${index===activeVisualIndex?' active':''}" data-visual-index="${index}" aria-pressed="${index===activeVisualIndex}"><img src="${escapeHtml(item.url)}" alt=""><span>${escapeHtml(item.label)}</span></button>`).join('')}
+  </div>`;
 }
 
 function openProduct(code) {
   const product = groups.find(p => p.codigo_modelo === code);
   if (!product) return;
-  let selectedIndex = product.variants.findIndex(v => v.disponible && (v.imagenes || []).length);
+  let selectedIndex = product.variants.findIndex(v => v.disponible && parseImages(v.imagenes).length);
   if (selectedIndex < 0) selectedIndex = product.variants.findIndex(v => v.disponible);
   if (selectedIndex < 0) selectedIndex = 0;
-  let galleryIndex = 0;
+  const items = visualItems(product);
+  let activeVisualIndex = items.findIndex(i => i.type === 'cover');
+  if (activeVisualIndex < 0) activeVisualIndex = Math.max(0, items.findIndex(i => i.variantIndex === selectedIndex));
 
   const renderDialog = () => {
     const selected = product.variants[selectedIndex];
-    const images = variantImages(selected, product);
     const displayName = productDisplayName(product);
     const selectedLabel = presentationLabel(selected);
-    const selectedPrice = showPrices && selected.precio_minorista != null
-      ? `<strong class="selected-price">${money(selected.precio_minorista)}</strong>`
-      : '';
+    const selectedPrice = showPrices && selected.precio_minorista != null ? `<strong class="selected-price">${money(selected.precio_minorista)}</strong>` : '';
+    const item = items[activeVisualIndex] || items[0];
+    const isCover = item.type === 'cover';
 
-    content.innerHTML = `<div class="dialog-gallery" data-dialog-gallery>${galleryMarkup(images, displayName)}</div>
+    content.innerHTML = `<div class="dialog-gallery">${galleryMarkup(items, activeVisualIndex, displayName)}</div>
       <div class="dialog-details">
-        <div class="dialog-product-heading">
-          <p class="eyebrow">${escapeHtml(product.categoria)}</p>
-          <h2>${escapeHtml(displayName)}</h2>
-          ${selectedPrice}
+        <div class="first-screen-summary">
+          <div class="dialog-product-heading"><p class="eyebrow">${escapeHtml(product.categoria)}</p><h2>${escapeHtml(displayName)}</h2>${selectedPrice}</div>
+          <div class="selected-summary"><span>Presentación seleccionada</span><strong>${escapeHtml(selectedLabel)}</strong><small>${selected.disponible ? 'Disponible' : 'Agotado'}${selected.sku ? ` · ${escapeHtml(selected.sku)}` : ''}</small></div>
+          <div class="quick-characteristics"><span><b>Exterior:</b> ${escapeHtml(String(selected.color_caja || '').replace(/^caja\s+/i,'') || 'No especificado')}</span>${selected.color_interior ? `<span><b>Interior:</b> ${escapeHtml(selected.color_interior)}</span>` : ''}${selected.piezas ? `<span><b>Piezas:</b> ${escapeHtml(selected.piezas)}</span>` : ''}</div>
         </div>
-        <section class="presentation-selector" aria-label="Presentaciones del producto">
-          <div class="presentation-heading">
-            <div><h3>Elige una presentación</h3><p>Selecciona una opción para cambiar la fotografía y los detalles.</p></div>
-            <div class="variant-navigation" aria-label="Navegar presentaciones">
-              <button type="button" class="variant-nav variant-prev" aria-label="Presentación anterior">‹</button>
-              <button type="button" class="variant-nav variant-next" aria-label="Presentación siguiente">›</button>
-            </div>
-          </div>
-          <p class="selected-presentation">Seleccionado: <strong>${escapeHtml(selectedLabel)}</strong></p>
-          <div class="variants" data-variants-strip>${product.variants.map((v, index) => variantMarkup(v, index, selectedIndex, product)).join('')}</div>
-        </section>
-        <section class="dialog-description">
-          <h3>Descripción</h3>
-          <p>${escapeHtml(product.descripcion)}</p>
-          ${selected.detalle_distintivo ? `<p class="variant-detail">${escapeHtml(selected.detalle_distintivo)}</p>` : ''}
-        </section>
+        <section class="dialog-description"><details open><summary>Descripción</summary><p>${escapeHtml(product.descripcion)}</p></details>${selected.detalle_distintivo ? `<details><summary>Características de esta presentación</summary><p class="variant-detail">${escapeHtml(selected.detalle_distintivo)}</p></details>` : ''}</section>
         <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" data-variant-whatsapp>Consultar por WhatsApp</a><button id="share-product" class="button secondary" type="button">Compartir</button></div>
       </div>`;
 
-    const setGallery = next => {
-      const slides = [...content.querySelectorAll('.gallery-slide')];
-      const thumbs = [...content.querySelectorAll('.gallery-thumb')];
-      if (!slides.length) return;
-      galleryIndex = (next + slides.length) % slides.length;
-      slides.forEach((slide, i) => slide.classList.toggle('active', i === galleryIndex));
-      thumbs.forEach((thumb, i) => thumb.classList.toggle('active', i === galleryIndex));
-      const current = content.querySelector('[data-gallery-current]');
-      if (current) current.textContent = galleryIndex + 1;
-      slides[galleryIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    };
-
-    content.querySelector('.gallery-prev')?.addEventListener('click', () => setGallery(galleryIndex - 1));
-    content.querySelector('.gallery-next')?.addEventListener('click', () => setGallery(galleryIndex + 1));
-    content.querySelectorAll('[data-gallery-go]').forEach(button => button.addEventListener('click', () => setGallery(Number(button.dataset.galleryGo))));
-    const track = content.querySelector('.gallery-track');
-    track?.addEventListener('scroll', () => {
-      const width = track.clientWidth || 1;
-      const next = Math.round(track.scrollLeft / width);
-      if (next !== galleryIndex) {
-        galleryIndex = Math.max(0, Math.min(next, images.length - 1));
-        content.querySelectorAll('.gallery-thumb').forEach((thumb, i) => thumb.classList.toggle('active', i === galleryIndex));
-        const current = content.querySelector('[data-gallery-current]');
-        if (current) current.textContent = galleryIndex + 1;
+    const chooseVisual = index => {
+      const nextItem = items[index];
+      if (!nextItem) return;
+      activeVisualIndex = index;
+      if (nextItem.variantIndex != null) {
+        const nextVariant = product.variants[nextItem.variantIndex];
+        if (nextVariant?.disponible) selectedIndex = nextItem.variantIndex;
       }
-    }, { passive: true });
-
-    const selectVariant = index => {
-      const next = product.variants[index];
-      if (!next || !next.disponible || index === selectedIndex) return;
-      selectedIndex = index;
-      galleryIndex = 0;
       renderDialog();
-      requestAnimationFrame(() => {
-        const active = content.querySelector('.variant-card.active');
-        active?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      });
+      requestAnimationFrame(() => content.querySelector(`.visual-thumb[data-visual-index="${activeVisualIndex}"]`)?.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'}));
     };
 
-    content.querySelectorAll('[data-variant-index]').forEach(button => button.addEventListener('click', () => selectVariant(Number(button.dataset.variantIndex))));
+    content.querySelectorAll('[data-visual-index]').forEach(button => button.addEventListener('click', () => chooseVisual(Number(button.dataset.visualIndex))));
+    content.querySelector('.gallery-prev')?.addEventListener('click', () => chooseVisual((activeVisualIndex - 1 + items.length) % items.length));
+    content.querySelector('.gallery-next')?.addEventListener('click', () => chooseVisual((activeVisualIndex + 1) % items.length));
 
-    const moveVariant = direction => {
-      const available = product.variants.map((v, i) => v.disponible ? i : -1).filter(i => i >= 0);
-      if (!available.length) return;
-      const position = Math.max(0, available.indexOf(selectedIndex));
-      selectVariant(available[(position + direction + available.length) % available.length]);
-    };
-    content.querySelector('.variant-prev')?.addEventListener('click', () => moveVariant(-1));
-    content.querySelector('.variant-next')?.addEventListener('click', () => moveVariant(1));
+    let touchStartX = 0;
+    const stage = content.querySelector('.gallery-stage');
+    stage?.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, {passive:true});
+    stage?.addEventListener('touchend', e => {
+      const delta = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(delta) > 45) chooseVisual((activeVisualIndex + (delta < 0 ? 1 : -1) + items.length) % items.length);
+    }, {passive:true});
 
     const whatsappText = `Hola, quisiera consultar por ${displayName}, presentación ${selectedLabel} (${selected.sku}).`;
     content.querySelector('[data-variant-whatsapp]').href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(whatsappText)}`;
-    content.querySelector('#share-product').addEventListener('click', () => shareProduct({ ...product, nombre: displayName }, selected, images[galleryIndex] || images[0]));
+    content.querySelector('#share-product')?.addEventListener('click', () => shareProduct({ ...product, nombre: displayName }, selected, item.url));
+    content.querySelector('.gallery-main-image')?.classList.toggle('showing-cover', isCover);
   };
 
   renderDialog();
@@ -265,69 +194,44 @@ async function shareProduct(product, variant, imageUrl) {
   const priceText = showPrices && variant.precio_minorista != null ? money(variant.precio_minorista) : 'Consultar por WhatsApp';
   const available = variant.disponible ? 'Disponible' : 'Agotado';
   const presentation = [variant.color_caja ? `Exterior: ${String(variant.color_caja).replace(/^caja\s+/i, '')}` : '', variant.color_interior ? `Interior: ${variant.color_interior}` : ''].filter(Boolean).join('\n');
-  const text = applyTemplate(shareTemplate, {
-    nombre: product.nombre,
-    descripcion: product.descripcion,
-    detalle: [presentation, variant.detalle_distintivo].filter(Boolean).join('\n'),
-    precio: priceText,
-    disponibilidad: available,
-    codigo: variant.sku || product.codigo_modelo,
-    enlace: location.href
-  });
+  const text = applyTemplate(shareTemplate, { nombre: product.nombre, descripcion: product.descripcion, detalle: [presentation, variant.detalle_distintivo].filter(Boolean).join('\n'), precio: priceText, disponibilidad: available, codigo: variant.sku || product.codigo_modelo, enlace: location.href });
   if (navigator.share && imageUrl) {
     try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
+      const response = await fetch(imageUrl); const blob = await response.blob();
       const extension = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
       const safeName = product.nombre.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
       const file = new File([blob], `${safeName}.${extension}`, { type: blob.type || 'image/jpeg' });
-      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ title: product.nombre, text, files: [file] });
-        return;
-      }
-    } catch (error) {
-      if (error?.name === 'AbortError') return;
-    }
+      if (!navigator.canShare || navigator.canShare({ files:[file] })) { await navigator.share({ title:product.nombre, text, files:[file] }); return; }
+    } catch (error) { if (error?.name === 'AbortError') return; }
   }
-  if (navigator.share) {
-    try { await navigator.share({ title: product.nombre, text }); return; }
-    catch (error) { if (error?.name === 'AbortError') return; }
-  }
+  if (navigator.share) { try { await navigator.share({ title:product.nombre, text }); return; } catch (error) { if (error?.name === 'AbortError') return; } }
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
 }
 
 function applyTemplate(template, values) {
-  return template.replace(/\{(nombre|descripcion|detalle|precio|disponibilidad|codigo|enlace)\}/g, (_match, key) => values[key] ?? '').replace(/\n{3,}/g, '\n\n').trim();
+  return template.replace(/\{(nombre|descripcion|detalle|precio|disponibilidad|codigo|enlace)\}/g, (_m,key) => values[key] ?? '').replace(/\n{3,}/g,'\n\n').trim();
 }
 
 dialog.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
-document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
-  document.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
-  button.classList.add('active'); render(button.dataset.filter);
-}));
+document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('.filter').forEach(b => b.classList.remove('active')); button.classList.add('active'); render(button.dataset.filter); }));
 
 async function load() {
-  status.hidden = false;
-  status.textContent = 'Cargando productos…';
+  status.hidden = false; status.textContent = 'Cargando productos…';
   try {
     const [{ data, error }, { data: config }] = await Promise.all([
       db.from('productos_publicos').select('*').order('orden'),
-      db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id', 'catalogo').single()
+      db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id','catalogo').single()
     ]);
     if (error) throw error;
     shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;
     showPrices = config?.mostrar_precios === true;
     companyName = config?.nombre_empresa?.trim() || 'Importadora A&N';
     brandLogo = config?.logo_url || './assets/logo.png';
-    applyBrand();
-    groups = groupProducts(data || []);
-    render();
-    status.hidden = true;
+    applyBrand(); groups = groupProducts(data || []); render(); status.hidden = true;
   } catch (error) {
     console.error('Error al cargar el catálogo:', error);
-    status.hidden = false;
-    status.textContent = 'No pudimos cargar el catálogo. Actualiza la página para intentarlo nuevamente.';
+    status.hidden = false; status.textContent = 'No pudimos cargar el catálogo. Actualiza la página para intentarlo nuevamente.';
   }
 }
 load();

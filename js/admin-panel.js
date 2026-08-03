@@ -241,7 +241,8 @@ function bindColorControl(form, type) {
 
 function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
-  const thumbnail = firstImage || '../assets/logo.png';
+  const coverImage = p.imagen_portada || '';
+  const thumbnail = firstImage || coverImage || '../assets/logo.png';
   const stock = Number(i.stock || 0);
   const baseValue = i.precio_base ?? '';
   const costFactor = i.factor_costo ?? 2.6;
@@ -336,7 +337,15 @@ function editor(p, i) {
             <summary><span><b>4</b> Fotografías</span><small>${(p.imagenes || []).length} imagen(es)</small></summary>
             <section class="admin-form-section photos-section" aria-labelledby="photos-${attr(p.sku)}">
               <div class="admin-section-heading"><div><div><h3 id="photos-${attr(p.sku)}">Imágenes de la presentación</h3><p>Estas fotografías cambian cuando el cliente selecciona esta variante.</p></div></div></div>
-              <label>Agregar fotografías<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+              <div class="cover-admin-box">
+                <div class="cover-admin-preview">
+                  <img src="${attr(coverImage || thumbnail)}" alt="Portada actual del modelo" data-cover-preview>
+                  <div><strong>Imagen de portada del modelo</strong><small>Debe mostrar claramente todas las presentaciones. Se comparte entre los productos con el mismo código de modelo.</small></div>
+                </div>
+                <label>Seleccionar nueva portada<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+                <input name="imagen_portada_actual" type="hidden" value="${attr(coverImage)}">
+              </div>
+              <label>Agregar fotografías de esta presentación<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
               <div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure><a href="${url}" target="_blank"><img src="${url}" alt="Foto ${n+1}"></a><button type="button" data-remove-photo="${url}">Eliminar</button></figure>`).join('')}</div>
             </section>
           </details>
@@ -352,6 +361,12 @@ function bindCard(card) {
   const form = card.querySelector('form');
   bindColorControl(form, 'exterior');
   bindColorControl(form, 'interior');
+  form.cover_photo?.addEventListener('change', event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const preview = form.querySelector('[data-cover-preview]');
+    if (preview) preview.src = URL.createObjectURL(file);
+  });
 
   const updateHeader = () => {
     const name = form.nombre.value.trim() || 'Producto sin nombre';
@@ -454,13 +469,34 @@ async function save(event, sku) {
   message.textContent = 'Guardando…';
   const fixedSku = sku;
   let images = [...form.querySelectorAll('.photo-list img')].map(i => i.src);
-  try { images = images.concat(await uploadPhotos(fixedSku, [...form.photos.files], images.length)); }
+  let coverUrl = form.imagen_portada_actual?.value || null;
+  try {
+    images = images.concat(await uploadPhotos(fixedSku, [...form.photos.files], images.length));
+    const coverFile = form.cover_photo?.files?.[0];
+    if (coverFile) coverUrl = await uploadModelCover(form.codigo_modelo.value.trim() || fixedSku, coverFile);
+  }
   catch (e) { message.textContent = e.message; return; }
   const retailPrice = nullableNumber(form.precio_minorista.value);
-  const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), precio_minorista: retailPrice, imagenes: images, actualizado_en:new Date().toISOString() };
+  const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
   const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), actualizado_en:new Date().toISOString() };
-  const [{ error: e1 }, { error: e2 }] = await Promise.all([db.from('productos_publicos').update(publicData).eq('sku', sku), db.from('inventario_privado').update(privateData).eq('sku', sku)]);
-  if (e1 || e2) message.textContent = `No se guardó: ${(e1 || e2).message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }
+  const modelCode = form.codigo_modelo.value.trim();
+  const updates = [
+    db.from('productos_publicos').update(publicData).eq('sku', sku),
+    db.from('inventario_privado').update(privateData).eq('sku', sku)
+  ];
+  if (modelCode && coverUrl) updates.push(db.from('productos_publicos').update({ imagen_portada: coverUrl, actualizado_en:new Date().toISOString() }).eq('codigo_modelo', modelCode));
+  const results = await Promise.all(updates);
+  const failed = results.find(result => result.error)?.error;
+  if (failed) message.textContent = `No se guardó: ${failed.message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }
+}
+
+async function uploadModelCover(modelCode, file) {
+  const blob = await compress(file);
+  const safeModel = String(modelCode || 'modelo').replace(/[^a-z0-9_-]+/gi, '-');
+  const path = `portadas/${safeModel}/portada-${Date.now()}.jpg`;
+  const { error } = await db.storage.from('productos').upload(path, blob, { contentType:'image/jpeg' });
+  if (error) throw error;
+  return db.storage.from('productos').getPublicUrl(path).data.publicUrl;
 }
 
 async function uploadPhotos(sku, files, existing) {

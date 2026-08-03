@@ -1,3 +1,15 @@
+
+## v0.8.6 — Galería móvil y portada por modelo
+
+- Portada independiente para cada modelo, pensada para mostrar todas las presentaciones juntas.
+- Miniaturas compactas con el nombre del color sobre la imagen.
+- Selección inmediata de presentación: actualiza imagen, precio, SKU, disponibilidad, características y WhatsApp.
+- Diseño móvil tipo marketplace, con imagen grande, flechas, deslizamiento y primer pantallazo optimizado.
+- El precio se oculta sin dejar espacios ni deformar el diseño cuando `mostrar_precios` está desactivado.
+- Requiere ejecutar `docs/04_portadas_modelo_v0.8.6.sql` en Supabase.
+
+Más detalles en `docs/UX_GALERIA_PORTADA_v0.8.6.md`.
+
 # Importadora A&N
 
 Sistema web para catálogo, productos, inventario, ventas, finanzas, usuarios y configuración.

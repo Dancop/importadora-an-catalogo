@@ -1,45 +1,27 @@
 # CHANGELOG
 
-## 0.9.0 — 2026-09-12
+## 0.9.0 — 2026-09-13
 
 ### Added
-- Editor enriquecido para las descripciones de productos.
-- Soporte para formato HTML seguro en las descripciones.
-- Negrita, cursiva, subrayado, listas con viñetas y listas numeradas.
+- Editor enriquecido para `descripcion` y `detalle_distintivo`.
+- Formato de negrita, cursiva, subrayado y listas.
+- Sanitización de HTML permitido.
+- Galería por presentación: cada variante puede mostrar todas sus fotografías.
 
 ### Changed
-- Rediseño del formulario de edición para mejorar la experiencia en escritorio.
-- Las áreas de descripción ahora utilizan el ancho disponible.
-- Las categorías visibles `Dama` y `Caballero` se presentan como `Mujer` y `Hombre`.
-- Se mantiene compatibilidad con productos existentes que todavía tengan los valores históricos de categoría.
-- La sanitización limita el HTML de las descripciones a elementos de formato permitidos.
-- No se requiere un nuevo script SQL.
+- Rediseño del formulario de edición en escritorio para aprovechar todo el ancho disponible.
+- Las descripciones ahora cuentan con un área de edición amplia.
+- `Dama` se presenta como `Mujer` y `Caballero` como `Hombre`; los registros antiguos siguen siendo compatibles.
+- La galería conserva una portada de modelo y cambia a la galería específica al seleccionar una presentación.
+- Las acciones de WhatsApp y Compartir permanecen accesibles en móvil.
+- Se corrigieron el centrado de las flechas y barras de desplazamiento innecesarias del visor móvil.
+
+### Database
+- No se requiere SQL nuevo.
 
 Autor: Codex + Daniel
 
-## 0.8.7 — Portadas por modelo y claridad móvil (2026-08-03)
-
-### Catálogo público
-- Se cambió la etiqueta ambigua **“Piezas”** por **“Incluye X artículos”**, evitando que el cliente la confunda con la cantidad disponible en stock.
-- El stock público continúa expresándose únicamente mediante estados como **Disponible** o **Agotado**.
-
-### Portada del modelo
-- La portada se administra como una imagen compartida por todas las presentaciones con el mismo `codigo_modelo`.
-- Ahora puede elegirse una portada entre las fotografías ya cargadas de cualquiera de las presentaciones del modelo.
-- Se conserva la opción de subir una portada nueva cuando se necesita una composición general con todas las variantes.
-- La imagen elegida se marca visualmente con una estrella y se guarda para todo el modelo.
-- La prioridad es: portada seleccionada explícitamente; si no existe, primera imagen disponible del grupo como respaldo visual.
-
-### Panel administrativo móvil
-- El acceso **Ver catálogo** vuelve a estar visible en celulares como un botón compacto con icono.
-- El botón abre el catálogo público en una pestaña nueva y convive con el botón **Salir** sin desarmar la cabecera.
-
-### Base de datos
-- No se requieren nuevas columnas ni un nuevo script SQL respecto de v0.8.6.
-- Se reutiliza `imagen_portada` y el guardado sincroniza el valor entre registros del mismo `codigo_modelo`.
-
-
-## 0.8.6 — Galería móvil y portada por modelo
+# v0.8.6 — Galería móvil y portada por modelo
 
 - Se incorporó una imagen de portada compartida por `codigo_modelo`.
 - El panel permite subir una portada general desde la sección Fotografías.
@@ -50,6 +32,8 @@ Autor: Codex + Daniel
 - Se compactó el primer pantallazo móvil para reducir el desplazamiento inicial.
 - Se mantuvo el diseño estable cuando los precios están ocultos.
 - Se añadió `docs/04_portadas_modelo_v0.8.6.sql`.
+
+# CHANGELOG
 
 ## 0.8.5 — 2026-08-03
 
@@ -75,12 +59,16 @@ Autor: Codex + Daniel
 
 Autor: Codex + Daniel
 
+# Cambios
+
 ## 0.8.3 — 2026-07-30
 
 - El Dashboard muestra **Nuestra ganancia** acumulada junto a **Proveedor pendiente**, conservando una cuadrícula simétrica de cuatro tarjetas.
 - La tarjeta de ganancia diaria fue sustituida por la ganancia acumulada del negocio para comparar cifras equivalentes.
 - Se rediseñó la identidad del usuario en la cabecera con avatar por inicial, nombre y rol separados.
 - Se actualizaron versión y documentación.
+
+# CHANGELOG
 
 ## 0.8.1 - 2026-07-29
 
@@ -225,3 +213,24 @@ Autor: Codex + Daniel
 - Se añadió anulación desde el detalle de venta.
 - Se conserva el historial de movimientos de inventario al editar.
 - Se incorporó `02_edicion_ventas_v0.8.2.sql` para actualizar Supabase.
+
+## v0.8.7 — Portadas por modelo y claridad móvil (2026-08-03)
+
+### Catálogo público
+- Se cambió la etiqueta ambigua **“Piezas”** por **“Incluye X artículos”**, evitando que el cliente la confunda con la cantidad disponible en stock.
+- El stock público continúa expresándose únicamente mediante estados como **Disponible** o **Agotado**.
+
+### Portada del modelo
+- La portada se administra como una imagen compartida por todas las presentaciones con el mismo `codigo_modelo`.
+- Ahora puede elegirse una portada entre las fotografías ya cargadas de cualquiera de las presentaciones del modelo.
+- Se conserva la opción de subir una portada nueva cuando se necesita una composición general con todas las variantes.
+- La imagen elegida se marca visualmente con una estrella y se guarda para todo el modelo.
+- La prioridad es: portada seleccionada explícitamente; si no existe, primera imagen disponible del grupo como respaldo visual.
+
+### Panel administrativo móvil
+- El acceso **Ver catálogo** vuelve a estar visible en celulares como un botón compacto con icono.
+- El botón abre el catálogo público en una pestaña nueva y convive con el botón **Salir** sin desarmar la cabecera.
+
+### Base de datos
+- No se requieren nuevas columnas ni un nuevo script SQL respecto de v0.8.6.
+- Se reutiliza `imagen_portada` y el guardado sincroniza el valor entre registros del mismo `codigo_modelo`.

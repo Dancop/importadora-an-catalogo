@@ -3,7 +3,7 @@
 Importadora A&N
 Módulo: Panel administrativo
 Autor: Codex + Daniel
-Versión: 0.8.7
+Versión: 0.9.0
 Última modificación: 2026-08-03
 Descripción: Navegación, productos, configuración,
 rentabilidad y conexión con el dashboard.
@@ -179,8 +179,9 @@ async function loadProducts() {
 
 function applyRoleRestrictions() {
   const readOnly = currentRole === 'solo_lectura';
-  document.querySelectorAll('#products-panel input, #products-panel textarea, #products-panel select').forEach(control => {
-    if (control.name !== 'sku') control.disabled = readOnly;
+  document.querySelectorAll('#products-panel input, #products-panel textarea, #products-panel select, #products-panel [contenteditable="true"]').forEach(control => {
+    if (control.hasAttribute('contenteditable')) control.setAttribute('contenteditable', String(!readOnly));
+    else if (control.name !== 'sku') control.disabled = readOnly;
   });
   document.querySelectorAll('#products-panel [type="submit"], #products-panel [data-remove-photo]').forEach(button => {
     button.hidden = readOnly;
@@ -262,6 +263,81 @@ function getModelImageOptions(product) {
     });
   });
   return options;
+}
+
+function sanitizeRichHtml(value) {
+  const source = String(value ?? '');
+  if (!source) return '';
+  if (!/<\/?(?:b|strong|i|em|u|s|br|p|ul|ol|li)(?:\s|>)/i.test(source)) return source.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '<br>');
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(source, 'text/html');
+  const allowed = new Set(['B','STRONG','I','EM','U','S','BR','P','UL','OL','LI']);
+  const walk = node => {
+    [...node.childNodes].forEach(child => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        if (!allowed.has(child.tagName)) {
+          const fragment = document.createDocumentFragment();
+          while (child.firstChild) fragment.appendChild(child.firstChild);
+          child.replaceWith(fragment);
+        } else {
+          [...child.attributes].forEach(attribute => child.removeAttribute(attribute.name));
+          walk(child);
+        }
+      } else if (child.nodeType === Node.COMMENT_NODE) child.remove();
+    });
+  };
+  walk(doc.body);
+  return doc.body.innerHTML;
+}
+
+function richEditorMarkup(name, label, value) {
+  const safe = sanitizeRichHtml(value);
+  return `<div class="rich-field" data-rich-field="${name}">
+    <div class="rich-toolbar" role="toolbar" aria-label="Formato de ${label}">
+      <button type="button" data-rich-command="bold" title="Negrita"><b>B</b></button>
+      <button type="button" data-rich-command="italic" title="Cursiva"><i>I</i></button>
+      <button type="button" data-rich-command="underline" title="Subrayado"><u>U</u></button>
+      <span class="rich-toolbar-divider" aria-hidden="true"></span>
+      <button type="button" data-rich-command="insertUnorderedList" title="Lista con viñetas">• Lista</button>
+      <button type="button" data-rich-command="insertOrderedList" title="Lista numerada">1. Lista</button>
+      <span class="rich-toolbar-divider" aria-hidden="true"></span>
+      <button type="button" data-rich-command="removeFormat" title="Quitar formato">Tx</button>
+    </div>
+    <div class="rich-editor" contenteditable="true" spellcheck="true" data-rich-editor="${name}" aria-label="${label}">${safe}</div>
+    <input type="hidden" name="${name}" value="${attr(safe)}">
+    <small class="rich-help">Puedes usar negrita, cursiva, subrayado y listas.</small>
+  </div>`;
+}
+
+function syncRichEditor(form, name) {
+  const editor = form.querySelector(`[data-rich-editor="${name}"]`);
+  const hidden = form.querySelector(`input[name="${name}"]`);
+  if (!editor || !hidden) return;
+  hidden.value = sanitizeRichHtml(editor.innerHTML);
+}
+
+function bindRichEditors(form) {
+  form.querySelectorAll('[data-rich-editor]').forEach(editor => {
+    const name = editor.dataset.richEditor;
+    const hidden = form.querySelector(`input[name="${name}"]`);
+    if (hidden) hidden.value = sanitizeRichHtml(editor.innerHTML);
+    editor.addEventListener('input', () => syncRichEditor(form, name));
+    editor.addEventListener('blur', () => syncRichEditor(form, name));
+    editor.closest('.rich-field')?.querySelectorAll('[data-rich-command]').forEach(button => {
+      button.addEventListener('mousedown', event => event.preventDefault());
+      button.addEventListener('click', () => {
+        editor.focus();
+        document.execCommand(button.dataset.richCommand, false, null);
+        syncRichEditor(form, name);
+      });
+    });
+  });
+}
+
+function richText(value) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = sanitizeRichHtml(value);
+  return (wrapper.innerText || wrapper.textContent || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function editor(p, i) {
@@ -354,36 +430,8 @@ function editor(p, i) {
             <summary><span><b>3</b> Descripción</span><small>Texto que verá el cliente</small></summary>
             <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
               <div class="admin-section-heading"><div><div><h3 id="content-${attr(p.sku)}">Contenido del catálogo</h3><p>Edita únicamente cuando cambie la presentación o su contenido.</p></div></div></div>
-              <div class="rich-field">
-                <label>Descripción general</label>
-                <div class="rich-editor" data-rich-editor="descripcion">
-                  <div class="rich-toolbar" role="toolbar" aria-label="Formato de descripción general">
-                    <button type="button" data-command="bold" aria-label="Negrita"><strong>B</strong></button>
-                    <button type="button" data-command="italic" aria-label="Cursiva"><em>I</em></button>
-                    <button type="button" data-command="underline" aria-label="Subrayado"><u>U</u></button>
-                    <button type="button" data-command="insertUnorderedList" aria-label="Lista con viñetas">• Lista</button>
-                    <button type="button" data-command="insertOrderedList" aria-label="Lista numerada">1. Lista</button>
-                    <button type="button" data-command="removeFormat" aria-label="Quitar formato">Limpiar</button>
-                  </div>
-                  <div class="rich-content" contenteditable="true" role="textbox" aria-multiline="true" data-rich-content="descripcion"></div>
-                  <textarea name="descripcion" hidden>${text(p.descripcion)}</textarea>
-                </div>
-              </div>
-              <div class="rich-field">
-                <label>Contenido de esta presentación</label>
-                <div class="rich-editor" data-rich-editor="detalle_distintivo">
-                  <div class="rich-toolbar" role="toolbar" aria-label="Formato del contenido de esta presentación">
-                    <button type="button" data-command="bold" aria-label="Negrita"><strong>B</strong></button>
-                    <button type="button" data-command="italic" aria-label="Cursiva"><em>I</em></button>
-                    <button type="button" data-command="underline" aria-label="Subrayado"><u>U</u></button>
-                    <button type="button" data-command="insertUnorderedList" aria-label="Lista con viñetas">• Lista</button>
-                    <button type="button" data-command="insertOrderedList" aria-label="Lista numerada">1. Lista</button>
-                    <button type="button" data-command="removeFormat" aria-label="Quitar formato">Limpiar</button>
-                  </div>
-                  <div class="rich-content" contenteditable="true" role="textbox" aria-multiline="true" data-rich-content="detalle_distintivo"></div>
-                  <textarea name="detalle_distintivo" hidden>${text(p.detalle_distintivo)}</textarea>
-                </div>
-              </div>
+              <label>Descripción general${richEditorMarkup('descripcion', 'Descripción general', p.descripcion)}</label>
+              <label>Contenido de esta presentación${richEditorMarkup('detalle_distintivo', 'Contenido de esta presentación', p.detalle_distintivo)}</label>
             </section>
           </details>
 
@@ -421,6 +469,7 @@ function bindCard(card) {
   const form = card.querySelector('form');
   bindColorControl(form, 'exterior');
   bindColorControl(form, 'interior');
+  bindRichEditors(form);
   form.querySelectorAll('input[name="existing_cover"]').forEach(input => {
     input.addEventListener('change', () => {
       if (!input.checked) return;
@@ -441,24 +490,6 @@ function bindCard(card) {
     if (preview) preview.src = URL.createObjectURL(file);
     form.querySelectorAll('input[name="existing_cover"]').forEach(input => { input.checked = false; });
     form.querySelectorAll('.existing-cover-option').forEach(option => option.classList.remove('selected'));
-  });
-
-  form.querySelectorAll('[data-rich-editor]').forEach(editor => {
-    const name = editor.dataset.richEditor;
-    const content = editor.querySelector('[data-rich-content]');
-    const source = form.querySelector(`textarea[name="${name}"]`);
-    if (!content || !source) return;
-    content.innerHTML = sanitizeRichHtml(source.value);
-    const sync = () => { source.value = sanitizeRichHtml(content.innerHTML); updateHeader(); };
-    content.addEventListener('input', sync);
-    editor.querySelectorAll('[data-command]').forEach(button => {
-      button.addEventListener('mousedown', event => event.preventDefault());
-      button.addEventListener('click', () => {
-        content.focus();
-        document.execCommand(button.dataset.command, false, null);
-        sync();
-      });
-    });
   });
 
   const updateHeader = () => {
@@ -538,7 +569,8 @@ function bindCard(card) {
   form.multiplicador_mayorista.addEventListener('input', () => updatePriceFromMultiplier('mayorista'));
   form.multiplicador_minorista.addEventListener('input', () => updatePriceFromMultiplier('minorista'));
   form.stock.addEventListener('input', updateStock);
-  ['nombre','codigo_modelo','color_caja','color_interior','color_exterior_hex','color_interior_hex','descripcion','detalle_distintivo'].forEach(name => form[name].addEventListener('input', updateHeader));
+  ['nombre','codigo_modelo','color_caja','color_interior','color_exterior_hex','color_interior_hex'].forEach(name => form[name].addEventListener('input', updateHeader));
+  form.querySelectorAll('[data-rich-editor]').forEach(editor => editor.addEventListener('input', updateHeader));
   form.addEventListener('submit', e => save(e, card.dataset.sku));
   form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
   form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
@@ -658,8 +690,8 @@ function descriptionText(form, sku) {
   const price = retailPrice > 0 ? `Bs ${formatNumber(retailPrice)}` : 'Consultar precio';
   const availability = Number(form.stock.value) > 0 ? 'Disponible' : 'Agotado';
   return applyTemplate(shareTemplate, {
-    nombre: form.nombre.value.trim(), descripcion: form.descripcion.value.trim(),
-    detalle: form.detalle_distintivo.value.trim(), precio: price,
+    nombre: form.nombre.value.trim(), descripcion: richText(form.descripcion.value),
+    detalle: richText(form.detalle_distintivo.value), precio: price,
     disponibilidad: availability, codigo: sku,
     enlace: new URL('../', location.href).href
   });
@@ -724,32 +756,6 @@ async function share(value, imageUrl, productName) {
   }
   window.open(`https://wa.me/?text=${encodeURIComponent(value)}`, '_blank', 'noopener');
 }
-function sanitizeRichHtml(value) {
-  const source = String(value ?? '');
-  if (!source.trim()) return '';
-  const doc = new DOMParser().parseFromString(`<div>${source}</div>`, 'text/html');
-  const allowed = new Set(['B','STRONG','I','EM','U','S','UL','OL','LI','P','BR']);
-  const root = doc.body.firstElementChild;
-  if (!root) return '';
-  const clean = node => {
-    [...node.childNodes].forEach(child => {
-      if (child.nodeType === Node.COMMENT_NODE) { child.remove(); return; }
-      if (child.nodeType !== Node.ELEMENT_NODE) return;
-      if (!allowed.has(child.tagName)) {
-        const fragment = doc.createDocumentFragment();
-        while (child.firstChild) fragment.appendChild(child.firstChild);
-        child.replaceWith(fragment);
-        clean(node);
-        return;
-      }
-      [...child.attributes].forEach(attr => child.removeAttribute(attr.name));
-      clean(child);
-    });
-  };
-  clean(root);
-  return root.innerHTML.trim();
-}
-
 function attr(v) { return String(v ?? '').replace(/[&"]/g, c => c === '&' ? '&amp;' : '&quot;'); }
 function text(v) { return String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 

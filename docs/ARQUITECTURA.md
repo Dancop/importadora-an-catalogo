@@ -111,31 +111,11 @@ La edición se realiza exclusivamente mediante la RPC `editar_venta()`. La funci
 - `Proveedor pendiente` conserva el saldo acumulado calculado por la función.
 - La cabecera representa la identidad del usuario como información, no como botón: inicial, nombre y rol.
 
+## v0.9.0 — Contenido enriquecido y galerías por presentación
 
-## Editor enriquecido de descripciones — v0.9.0
-
-Las columnas `productos_publicos.descripcion` y `productos_publicos.detalle_distintivo` pueden contener HTML de formato limitado.
-
-### Frontend administrativo
-
-`js/admin-panel.js` utiliza un editor `contenteditable` con una barra de herramientas para:
-- negrita (`strong`/`b`)
-- cursiva (`em`/`i`)
-- subrayado (`u`)
-- listas con viñetas (`ul`/`li`)
-- listas numeradas (`ol`/`li`)
-- quitar formato
-
-El contenido se sincroniza con campos ocultos del formulario antes de guardar.
-
-### Seguridad
-
-El HTML se sanitiza con una lista permitida de elementos. Se eliminan atributos y elementos no autorizados antes de persistir el contenido y nuevamente antes de mostrarlo en el catálogo público. No se permiten scripts, eventos HTML, estilos embebidos ni URLs dentro de las descripciones.
-
-### Compatibilidad
-
-Los productos que ya contienen texto plano continúan funcionando sin migración. Esta versión no requiere cambios de esquema ni un nuevo SQL.
-
-## Categorías visibles — v0.9.0
-
-La interfaz pública utiliza `Mujer` y `Hombre`. Para compatibilidad con registros anteriores, el frontend normaliza `Dama` a `Mujer` y `Caballero` a `Hombre` al mostrar y filtrar.
+- `productos_publicos.imagenes` continúa almacenando las fotografías específicas de cada SKU/presentación.
+- `productos_publicos.imagen_portada` representa la portada compartida del modelo (`codigo_modelo`).
+- El catálogo agrupa las variantes por `codigo_modelo` y, al seleccionar una presentación, utiliza todas las imágenes de `imagenes` de ese SKU para la galería.
+- `descripcion` y `detalle_distintivo` pueden almacenar HTML limitado a etiquetas de formato seguro (`strong`, `b`, `em`, `i`, `u`, `s`, `p`, `br`, `ul`, `ol`, `li`).
+- El panel administrativo sanitiza el HTML antes de guardarlo; el catálogo vuelve a sanitizarlo antes de renderizarlo.
+- No se requiere una modificación del esquema de Supabase para v0.9.0.

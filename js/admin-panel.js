@@ -264,89 +264,6 @@ function getModelImageOptions(product) {
   return options;
 }
 
-function sanitizeRichHtml(value) {
-  const source = String(value ?? '').trim();
-  if (!source) return '';
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = source;
-  const allowed = new Set(['B','STRONG','I','EM','U','UL','OL','LI','P','BR']);
-  const walk = node => {
-    [...node.childNodes].forEach(child => {
-      if (child.nodeType === Node.ELEMENT_NODE) {
-        if (!allowed.has(child.tagName)) {
-          while (child.firstChild) node.insertBefore(child.firstChild, child);
-          child.remove();
-        } else {
-          [...child.attributes].forEach(attr => child.removeAttribute(attr.name));
-          walk(child);
-        }
-      } else if (child.nodeType !== Node.TEXT_NODE && child.nodeType !== Node.COMMENT_NODE) {
-        child.remove();
-      }
-    });
-  };
-  walk(wrapper);
-  return wrapper.innerHTML.trim();
-}
-
-function richEditorHtml(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-  if (/<\/?[a-z][\s\S]*>/i.test(raw)) return sanitizeRichHtml(raw);
-  return text(raw).replace(/\r?\n/g, '<br>');
-}
-
-function richEditorMarkup(name, value, label, hint = '') {
-  const html = richEditorHtml(value);
-  const readonly = currentRole === 'solo_lectura';
-  const disabled = readonly ? ' disabled' : '';
-  return `<div class="rich-field" data-rich-field="${attr(name)}">
-    <div class="rich-field-heading"><strong>${text(label)}</strong>${hint ? `<small>${text(hint)}</small>` : ''}</div>
-    <div class="rich-toolbar" role="toolbar" aria-label="Formato de ${attr(label)}">
-      <button type="button" data-rich-command="bold" aria-label="Negrita"${disabled}><b>B</b></button>
-      <button type="button" data-rich-command="italic" aria-label="Cursiva"${disabled}><i>I</i></button>
-      <button type="button" data-rich-command="underline" aria-label="Subrayado"${disabled}><u>U</u></button>
-      <span class="rich-toolbar-separator" aria-hidden="true"></span>
-      <button type="button" data-rich-command="insertUnorderedList" aria-label="Lista con viñetas"${disabled}>• Lista</button>
-      <button type="button" data-rich-command="insertOrderedList" aria-label="Lista numerada"${disabled}>1. Lista</button>
-      <span class="rich-toolbar-separator" aria-hidden="true"></span>
-      <button type="button" data-rich-command="removeFormat" aria-label="Quitar formato"${disabled}>Limpiar</button>
-    </div>
-    <div class="rich-editor" contenteditable="${readonly ? 'false' : 'true'}" data-rich-editor="${attr(name)}" role="textbox" aria-multiline="true"${readonly ? ' aria-readonly="true"' : ''}>${html}</div>
-    <textarea name="${attr(name)}" class="rich-source" tabindex="-1" aria-hidden="true">${text(raw)}</textarea>
-  </div>`;
-}
-
-function syncRichEditor(field) {
-  const editorElement = field.querySelector('[data-rich-editor]');
-  const source = field.querySelector('.rich-source');
-  if (!editorElement || !source) return '';
-  const clean = sanitizeRichHtml(editorElement.innerHTML);
-  if (editorElement.innerHTML !== clean) editorElement.innerHTML = clean;
-  source.value = clean;
-  return clean;
-}
-
-function bindRichEditors(form, onChange) {
-  form.querySelectorAll('[data-rich-field]').forEach(field => {
-    const editorElement = field.querySelector('[data-rich-editor]');
-    const source = field.querySelector('.rich-source');
-    if (!editorElement || !source) return;
-    editorElement.addEventListener('input', () => { syncRichEditor(field); onChange?.(); });
-    field.querySelectorAll('[data-rich-command]').forEach(button => {
-      button.addEventListener('mousedown', event => event.preventDefault());
-      button.addEventListener('click', () => {
-        if (currentRole === 'solo_lectura') return;
-        editorElement.focus();
-        document.execCommand(button.dataset.richCommand, false, null);
-        syncRichEditor(field);
-        onChange?.();
-      });
-    });
-    syncRichEditor(field);
-  });
-}
-
 function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
   const coverImage = p.imagen_portada || '';
@@ -437,8 +354,36 @@ function editor(p, i) {
             <summary><span><b>3</b> Descripción</span><small>Texto que verá el cliente</small></summary>
             <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
               <div class="admin-section-heading"><div><div><h3 id="content-${attr(p.sku)}">Contenido del catálogo</h3><p>Edita únicamente cuando cambie la presentación o su contenido.</p></div></div></div>
-              ${richEditorMarkup('descripcion', p.descripcion, 'Descripción general', 'Puedes usar negrita, cursiva y listas.')}
-              ${richEditorMarkup('detalle_distintivo', p.detalle_distintivo, 'Contenido de esta presentación', 'Ideal para enumerar lo que incluye el producto.')}
+              <div class="rich-field">
+                <label>Descripción general</label>
+                <div class="rich-editor" data-rich-editor="descripcion">
+                  <div class="rich-toolbar" role="toolbar" aria-label="Formato de descripción general">
+                    <button type="button" data-command="bold" aria-label="Negrita"><strong>B</strong></button>
+                    <button type="button" data-command="italic" aria-label="Cursiva"><em>I</em></button>
+                    <button type="button" data-command="underline" aria-label="Subrayado"><u>U</u></button>
+                    <button type="button" data-command="insertUnorderedList" aria-label="Lista con viñetas">• Lista</button>
+                    <button type="button" data-command="insertOrderedList" aria-label="Lista numerada">1. Lista</button>
+                    <button type="button" data-command="removeFormat" aria-label="Quitar formato">Limpiar</button>
+                  </div>
+                  <div class="rich-content" contenteditable="true" role="textbox" aria-multiline="true" data-rich-content="descripcion"></div>
+                  <textarea name="descripcion" hidden>${text(p.descripcion)}</textarea>
+                </div>
+              </div>
+              <div class="rich-field">
+                <label>Contenido de esta presentación</label>
+                <div class="rich-editor" data-rich-editor="detalle_distintivo">
+                  <div class="rich-toolbar" role="toolbar" aria-label="Formato del contenido de esta presentación">
+                    <button type="button" data-command="bold" aria-label="Negrita"><strong>B</strong></button>
+                    <button type="button" data-command="italic" aria-label="Cursiva"><em>I</em></button>
+                    <button type="button" data-command="underline" aria-label="Subrayado"><u>U</u></button>
+                    <button type="button" data-command="insertUnorderedList" aria-label="Lista con viñetas">• Lista</button>
+                    <button type="button" data-command="insertOrderedList" aria-label="Lista numerada">1. Lista</button>
+                    <button type="button" data-command="removeFormat" aria-label="Quitar formato">Limpiar</button>
+                  </div>
+                  <div class="rich-content" contenteditable="true" role="textbox" aria-multiline="true" data-rich-content="detalle_distintivo"></div>
+                  <textarea name="detalle_distintivo" hidden>${text(p.detalle_distintivo)}</textarea>
+                </div>
+              </div>
             </section>
           </details>
 
@@ -498,7 +443,23 @@ function bindCard(card) {
     form.querySelectorAll('.existing-cover-option').forEach(option => option.classList.remove('selected'));
   });
 
-  bindRichEditors(form, () => updateHeader());
+  form.querySelectorAll('[data-rich-editor]').forEach(editor => {
+    const name = editor.dataset.richEditor;
+    const content = editor.querySelector('[data-rich-content]');
+    const source = form.querySelector(`textarea[name="${name}"]`);
+    if (!content || !source) return;
+    content.innerHTML = sanitizeRichHtml(source.value);
+    const sync = () => { source.value = sanitizeRichHtml(content.innerHTML); updateHeader(); };
+    content.addEventListener('input', sync);
+    editor.querySelectorAll('[data-command]').forEach(button => {
+      button.addEventListener('mousedown', event => event.preventDefault());
+      button.addEventListener('click', () => {
+        content.focus();
+        document.execCommand(button.dataset.command, false, null);
+        sync();
+      });
+    });
+  });
 
   const updateHeader = () => {
     const name = form.nombre.value.trim() || 'Producto sin nombre';
@@ -577,7 +538,7 @@ function bindCard(card) {
   form.multiplicador_mayorista.addEventListener('input', () => updatePriceFromMultiplier('mayorista'));
   form.multiplicador_minorista.addEventListener('input', () => updatePriceFromMultiplier('minorista'));
   form.stock.addEventListener('input', updateStock);
-  ['nombre','codigo_modelo','color_caja','color_interior','color_exterior_hex','color_interior_hex'].forEach(name => form[name].addEventListener('input', updateHeader));
+  ['nombre','codigo_modelo','color_caja','color_interior','color_exterior_hex','color_interior_hex','descripcion','detalle_distintivo'].forEach(name => form[name].addEventListener('input', updateHeader));
   form.addEventListener('submit', e => save(e, card.dataset.sku));
   form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
   form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
@@ -692,26 +653,13 @@ async function removePhoto(sku, url) {
   loadProducts();
 }
 
-function richHtmlToPlainText(value) {
-  const source = String(value ?? '').trim();
-  if (!source) return '';
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = sanitizeRichHtml(source);
-  wrapper.querySelectorAll('li').forEach(li => li.insertAdjacentText('beforebegin', '• '));
-  wrapper.querySelectorAll('p, li, br').forEach(el => {
-    if (el.tagName === 'BR') el.insertAdjacentText('afterend', '\n');
-    else el.insertAdjacentText('afterend', '\n');
-  });
-  return wrapper.textContent.replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-}
-
 function descriptionText(form, sku) {
   const retailPrice = Number(form.precio_minorista.value);
   const price = retailPrice > 0 ? `Bs ${formatNumber(retailPrice)}` : 'Consultar precio';
   const availability = Number(form.stock.value) > 0 ? 'Disponible' : 'Agotado';
   return applyTemplate(shareTemplate, {
-    nombre: form.nombre.value.trim(), descripcion: richHtmlToPlainText(form.descripcion.value),
-    detalle: richHtmlToPlainText(form.detalle_distintivo.value), precio: price,
+    nombre: form.nombre.value.trim(), descripcion: form.descripcion.value.trim(),
+    detalle: form.detalle_distintivo.value.trim(), precio: price,
     disponibilidad: availability, codigo: sku,
     enlace: new URL('../', location.href).href
   });
@@ -776,6 +724,32 @@ async function share(value, imageUrl, productName) {
   }
   window.open(`https://wa.me/?text=${encodeURIComponent(value)}`, '_blank', 'noopener');
 }
+function sanitizeRichHtml(value) {
+  const source = String(value ?? '');
+  if (!source.trim()) return '';
+  const doc = new DOMParser().parseFromString(`<div>${source}</div>`, 'text/html');
+  const allowed = new Set(['B','STRONG','I','EM','U','S','UL','OL','LI','P','BR']);
+  const root = doc.body.firstElementChild;
+  if (!root) return '';
+  const clean = node => {
+    [...node.childNodes].forEach(child => {
+      if (child.nodeType === Node.COMMENT_NODE) { child.remove(); return; }
+      if (child.nodeType !== Node.ELEMENT_NODE) return;
+      if (!allowed.has(child.tagName)) {
+        const fragment = doc.createDocumentFragment();
+        while (child.firstChild) fragment.appendChild(child.firstChild);
+        child.replaceWith(fragment);
+        clean(node);
+        return;
+      }
+      [...child.attributes].forEach(attr => child.removeAttribute(attr.name));
+      clean(child);
+    });
+  };
+  clean(root);
+  return root.innerHTML.trim();
+}
+
 function attr(v) { return String(v ?? '').replace(/[&"]/g, c => c === '&' ? '&amp;' : '&quot;'); }
 function text(v) { return String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 

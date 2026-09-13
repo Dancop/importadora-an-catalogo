@@ -663,39 +663,32 @@
   .existing-cover-option{flex-basis:92px}
 }
 
-
-/* ===== Editor enriquecido de descripciones ===== */
+/* ===== v0.9.0 — Editor enriquecido y formulario de edición ===== */
 .rich-field{display:grid;gap:7px}
-.rich-field-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-.rich-field-heading strong{color:var(--navy);font-size:.9rem}
-.rich-field-heading small{color:var(--muted);font-size:.72rem;font-weight:400}
-.rich-toolbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:7px;border:1px solid #ccd7df;border-bottom:0;border-radius:11px 11px 0 0;background:#f5f8f9}
-.rich-toolbar button{min-height:31px;padding:5px 9px;border:1px solid #d2dde2;border-radius:7px;background:#fff;color:var(--navy);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer}
-.rich-toolbar button:hover:not(:disabled){background:#edf4f7;border-color:#9eb5c1}
-.rich-toolbar button:disabled{opacity:.45;cursor:not-allowed}
-.rich-toolbar-separator{width:1px;height:22px;background:#d3dde2;margin:0 2px}
-.rich-editor{min-height:150px;padding:13px 14px;border:1px solid #ccd7df;border-radius:0 0 11px 11px;background:#fff;color:#253847;line-height:1.55;outline:none;overflow:auto}
-.rich-editor:focus{outline:3px solid rgba(88,121,145,.14);border-color:var(--blue)}
-.rich-editor[contenteditable="false"]{background:#f5f7f8;color:#5d6d77}
-.rich-editor p{margin:.25em 0 .7em}.rich-editor ul,.rich-editor ol{padding-left:1.5rem;margin:.4em 0 .7em}.rich-editor li{margin:.2em 0}
-.rich-source{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important;padding:0!important;margin:-1px!important}
-.rich-content{line-height:1.55;color:inherit}
-.rich-content p{margin:.15em 0 .7em}.rich-content p:last-child{margin-bottom:0}.rich-content ul,.rich-content ol{margin:.35em 0 .7em;padding-left:1.45rem}.rich-content li{margin:.2em 0}.rich-content strong,.rich-content b{font-weight:800}.rich-content em,.rich-content i{font-style:italic}.rich-content u{text-decoration:underline}
-.summary.rich-content{margin:0;color:var(--muted);font-size:.86rem}
-.dialog-description .rich-content{font-size:.95rem}
-.variant-detail.rich-content{color:var(--muted)}
+.rich-editor{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.rich-toolbar{display:flex;flex-wrap:wrap;gap:5px;padding:8px;border-bottom:1px solid var(--line);background:#f7fafb}
+.rich-toolbar button{border:1px solid #d7e0e4;background:#fff;color:var(--navy);border-radius:7px;padding:6px 9px;min-height:32px;cursor:pointer;font-size:.78rem}
+.rich-toolbar button:hover,.rich-toolbar button:focus-visible{background:#edf3f6;border-color:#b9cbd3}
+.rich-content{min-height:130px;padding:12px 14px;outline:none;line-height:1.55}
+.rich-content:focus{box-shadow:inset 0 0 0 2px rgba(88,121,145,.18)}
+.rich-content:empty:before{content:'Escribe aquí…';color:#9aa6ad}
+.rich-content ul,.rich-content ol{padding-left:1.5rem;margin:.45rem 0}
+.rich-content p{margin:.35rem 0}
+.rich-display ul,.rich-display ol{padding-left:1.5rem;margin:.45rem 0}
+.rich-display p{margin:.35rem 0}
+.rich-display:empty{display:none}
 
-/* En escritorio el formulario usa todo el ancho: los campos de texto no quedan atrapados en una columna estrecha. */
+/* En escritorio el editor ocupa el ancho disponible y no queda atrapado en una columna lateral. */
 @media(min-width:1000px){
-  .admin-card form{grid-template-columns:minmax(0,1fr)!important}
-  .commercial-section,.admin-secondary-grid,.form-message,.sticky-save-actions{grid-column:1/-1!important}
-  .admin-secondary-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;position:static!important}
-  .admin-secondary-grid .form-accordion:nth-child(2),
-  .admin-secondary-grid .form-accordion:nth-child(3){grid-column:1/-1}
-  .admin-secondary-grid .form-accordion{min-width:0}
+  .admin-card form{grid-template-columns:1fr}
+  .commercial-section,.admin-secondary-grid,.form-message,.sticky-save-actions{grid-column:1/-1}
+  .admin-secondary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;position:static}
+  .admin-secondary-grid .form-accordion:last-child{grid-column:1/-1}
+  .rich-field{min-width:0}
+  .rich-content{min-height:150px}
 }
 @media(max-width:760px){
-  .rich-field-heading{display:grid;gap:2px}
-  .rich-toolbar{gap:4px}.rich-toolbar button{padding:5px 7px}
-  .rich-editor{min-height:130px}
+  .rich-toolbar{gap:4px}
+  .rich-toolbar button{padding:6px 8px}
+  .rich-content{min-height:120px}
 }

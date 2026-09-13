@@ -22,6 +22,30 @@ function applyBrand() {
 
 const money = value => value == null ? 'Consultar precio' : `Bs ${Number(value).toLocaleString('es-BO', { maximumFractionDigits: 2 })}`;
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const sanitizeRichHtml = value => {
+  const source = String(value ?? '').trim();
+  if (!source) return '';
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = source;
+  const allowed = new Set(['B','STRONG','I','EM','U','UL','OL','LI','P','BR']);
+  const walk = node => {
+    [...node.childNodes].forEach(child => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        if (!allowed.has(child.tagName)) {
+          while (child.firstChild) node.insertBefore(child.firstChild, child);
+          child.remove();
+        } else {
+          [...child.attributes].forEach(attr => child.removeAttribute(attr.name));
+          walk(child);
+        }
+      } else if (child.nodeType !== Node.TEXT_NODE && child.nodeType !== Node.COMMENT_NODE) child.remove();
+    });
+  };
+  walk(wrapper);
+  return wrapper.innerHTML.trim();
+};
+const richHtml = value => sanitizeRichHtml(value);
+
 
 function parseImages(value) {
   if (Array.isArray(value)) return value.filter(Boolean);
@@ -32,10 +56,17 @@ function parseImages(value) {
   return [];
 }
 
+function normalizeCategory(value) {
+  const category = String(value ?? '').trim();
+  if (/^dama$/i.test(category)) return 'Mujer';
+  if (/^caballero$/i.test(category)) return 'Hombre';
+  return category;
+}
+
 function groupProducts(rows) {
   const map = new Map();
   rows.filter(row => row.disponible !== false).forEach((raw, index) => {
-    const row = { ...raw, imagenes: parseImages(raw.imagenes) };
+    const row = { ...raw, categoria: normalizeCategory(raw.categoria), imagenes: parseImages(raw.imagenes) };
     const code = String(row.codigo_modelo || '').trim();
     const fallback = String(row.sku || row.id || `producto-${index}`).trim();
     const key = code || fallback;
@@ -93,11 +124,11 @@ function card(product) {
   const bottom = showPrices
     ? `<div class="card-bottom"><strong>${prices.length ? money(Math.min(...prices)) : 'Consultar precio'}</strong><button class="text-button" type="button">${action}</button></div>`
     : `<div class="card-bottom price-hidden"><button class="text-button catalog-cta" type="button">${action}</button></div>`;
-  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}"><div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span>${countBadge}</div><div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(displayName)}</h3><p class="summary">${escapeHtml(product.descripcion)}</p>${bottom}</div></article>`;
+  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}"><div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span>${countBadge}</div><div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(displayName)}</h3><div class="summary rich-content">${richHtml(product.descripcion)}</div>${bottom}</div></article>`;
 }
 
 function render(filter = 'Todos') {
-  const visible = filter === 'Todos' ? groups : groups.filter(p => p.categoria === filter);
+  const visible = filter === 'Todos' ? groups : groups.filter(p => normalizeCategory(p.categoria) === filter);
   grid.innerHTML = visible.map(card).join('');
   grid.querySelectorAll('.product-card').forEach(el => el.addEventListener('click', () => openProduct(el.dataset.code)));
 }
@@ -152,7 +183,7 @@ function openProduct(code) {
           <div class="selected-summary"><span>Presentación seleccionada</span><strong>${escapeHtml(selectedLabel)}</strong><small>${selected.disponible ? 'Disponible' : 'Agotado'}${selected.sku ? ` · ${escapeHtml(selected.sku)}` : ''}</small></div>
           <div class="quick-characteristics"><span><b>Exterior:</b> ${escapeHtml(String(selected.color_caja || '').replace(/^caja\s+/i,'') || 'No especificado')}</span>${selected.color_interior ? `<span><b>Interior:</b> ${escapeHtml(selected.color_interior)}</span>` : ''}${selected.piezas ? `<span><b>Incluye:</b> ${escapeHtml(selected.piezas)} artículos</span>` : ''}</div>
         </div>
-        <section class="dialog-description"><details open><summary>Descripción</summary><p>${escapeHtml(product.descripcion)}</p></details>${selected.detalle_distintivo ? `<details><summary>Características de esta presentación</summary><p class="variant-detail">${escapeHtml(selected.detalle_distintivo)}</p></details>` : ''}</section>
+        <section class="dialog-description"><details open><summary>Descripción</summary><div class="rich-content">${richHtml(product.descripcion)}</div></details>${selected.detalle_distintivo ? `<details><summary>Características de esta presentación</summary><div class="variant-detail rich-content">${richHtml(selected.detalle_distintivo)}</div></details>` : ''}</section>
         <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" data-variant-whatsapp>Consultar por WhatsApp</a><button id="share-product" class="button secondary" type="button">Compartir</button></div>
       </div>`;
 

@@ -264,6 +264,89 @@ function getModelImageOptions(product) {
   return options;
 }
 
+function sanitizeRichHtml(value) {
+  const source = String(value ?? '').trim();
+  if (!source) return '';
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = source;
+  const allowed = new Set(['B','STRONG','I','EM','U','UL','OL','LI','P','BR']);
+  const walk = node => {
+    [...node.childNodes].forEach(child => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        if (!allowed.has(child.tagName)) {
+          while (child.firstChild) node.insertBefore(child.firstChild, child);
+          child.remove();
+        } else {
+          [...child.attributes].forEach(attr => child.removeAttribute(attr.name));
+          walk(child);
+        }
+      } else if (child.nodeType !== Node.TEXT_NODE && child.nodeType !== Node.COMMENT_NODE) {
+        child.remove();
+      }
+    });
+  };
+  walk(wrapper);
+  return wrapper.innerHTML.trim();
+}
+
+function richEditorHtml(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  if (/<\/?[a-z][\s\S]*>/i.test(raw)) return sanitizeRichHtml(raw);
+  return text(raw).replace(/\r?\n/g, '<br>');
+}
+
+function richEditorMarkup(name, value, label, hint = '') {
+  const html = richEditorHtml(value);
+  const readonly = currentRole === 'solo_lectura';
+  const disabled = readonly ? ' disabled' : '';
+  return `<div class="rich-field" data-rich-field="${attr(name)}">
+    <div class="rich-field-heading"><strong>${text(label)}</strong>${hint ? `<small>${text(hint)}</small>` : ''}</div>
+    <div class="rich-toolbar" role="toolbar" aria-label="Formato de ${attr(label)}">
+      <button type="button" data-rich-command="bold" aria-label="Negrita"${disabled}><b>B</b></button>
+      <button type="button" data-rich-command="italic" aria-label="Cursiva"${disabled}><i>I</i></button>
+      <button type="button" data-rich-command="underline" aria-label="Subrayado"${disabled}><u>U</u></button>
+      <span class="rich-toolbar-separator" aria-hidden="true"></span>
+      <button type="button" data-rich-command="insertUnorderedList" aria-label="Lista con viñetas"${disabled}>• Lista</button>
+      <button type="button" data-rich-command="insertOrderedList" aria-label="Lista numerada"${disabled}>1. Lista</button>
+      <span class="rich-toolbar-separator" aria-hidden="true"></span>
+      <button type="button" data-rich-command="removeFormat" aria-label="Quitar formato"${disabled}>Limpiar</button>
+    </div>
+    <div class="rich-editor" contenteditable="${readonly ? 'false' : 'true'}" data-rich-editor="${attr(name)}" role="textbox" aria-multiline="true"${readonly ? ' aria-readonly="true"' : ''}>${html}</div>
+    <textarea name="${attr(name)}" class="rich-source" tabindex="-1" aria-hidden="true">${text(raw)}</textarea>
+  </div>`;
+}
+
+function syncRichEditor(field) {
+  const editorElement = field.querySelector('[data-rich-editor]');
+  const source = field.querySelector('.rich-source');
+  if (!editorElement || !source) return '';
+  const clean = sanitizeRichHtml(editorElement.innerHTML);
+  if (editorElement.innerHTML !== clean) editorElement.innerHTML = clean;
+  source.value = clean;
+  return clean;
+}
+
+function bindRichEditors(form, onChange) {
+  form.querySelectorAll('[data-rich-field]').forEach(field => {
+    const editorElement = field.querySelector('[data-rich-editor]');
+    const source = field.querySelector('.rich-source');
+    if (!editorElement || !source) return;
+    editorElement.addEventListener('input', () => { syncRichEditor(field); onChange?.(); });
+    field.querySelectorAll('[data-rich-command]').forEach(button => {
+      button.addEventListener('mousedown', event => event.preventDefault());
+      button.addEventListener('click', () => {
+        if (currentRole === 'solo_lectura') return;
+        editorElement.focus();
+        document.execCommand(button.dataset.richCommand, false, null);
+        syncRichEditor(field);
+        onChange?.();
+      });
+    });
+    syncRichEditor(field);
+  });
+}
+
 function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
   const coverImage = p.imagen_portada || '';
@@ -354,8 +437,8 @@ function editor(p, i) {
             <summary><span><b>3</b> Descripción</span><small>Texto que verá el cliente</small></summary>
             <section class="admin-form-section content-section" aria-labelledby="content-${attr(p.sku)}">
               <div class="admin-section-heading"><div><div><h3 id="content-${attr(p.sku)}">Contenido del catálogo</h3><p>Edita únicamente cuando cambie la presentación o su contenido.</p></div></div></div>
-              <label>Descripción general<textarea name="descripcion" rows="4">${text(p.descripcion)}</textarea></label>
-              <label>Contenido de esta presentación<textarea name="detalle_distintivo" rows="4">${text(p.detalle_distintivo)}</textarea></label>
+              ${richEditorMarkup('descripcion', p.descripcion, 'Descripción general', 'Puedes usar negrita, cursiva y listas.')}
+              ${richEditorMarkup('detalle_distintivo', p.detalle_distintivo, 'Contenido de esta presentación', 'Ideal para enumerar lo que incluye el producto.')}
             </section>
           </details>
 
@@ -414,6 +497,8 @@ function bindCard(card) {
     form.querySelectorAll('input[name="existing_cover"]').forEach(input => { input.checked = false; });
     form.querySelectorAll('.existing-cover-option').forEach(option => option.classList.remove('selected'));
   });
+
+  bindRichEditors(form, () => updateHeader());
 
   const updateHeader = () => {
     const name = form.nombre.value.trim() || 'Producto sin nombre';
@@ -492,7 +577,7 @@ function bindCard(card) {
   form.multiplicador_mayorista.addEventListener('input', () => updatePriceFromMultiplier('mayorista'));
   form.multiplicador_minorista.addEventListener('input', () => updatePriceFromMultiplier('minorista'));
   form.stock.addEventListener('input', updateStock);
-  ['nombre','codigo_modelo','color_caja','color_interior','color_exterior_hex','color_interior_hex','descripcion','detalle_distintivo'].forEach(name => form[name].addEventListener('input', updateHeader));
+  ['nombre','codigo_modelo','color_caja','color_interior','color_exterior_hex','color_interior_hex'].forEach(name => form[name].addEventListener('input', updateHeader));
   form.addEventListener('submit', e => save(e, card.dataset.sku));
   form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
   form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
@@ -524,7 +609,7 @@ async function save(event, sku) {
   }
   catch (e) { message.textContent = e.message; return; }
   const retailPrice = nullableNumber(form.precio_minorista.value);
-  const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: form.descripcion.value.trim(), detalle_distintivo: form.detalle_distintivo.value.trim(), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
+  const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: sanitizeRichHtml(form.descripcion.value), detalle_distintivo: sanitizeRichHtml(form.detalle_distintivo.value), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
   const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), actualizado_en:new Date().toISOString() };
   const modelCode = form.codigo_modelo.value.trim();
   const updates = [
@@ -607,13 +692,26 @@ async function removePhoto(sku, url) {
   loadProducts();
 }
 
+function richHtmlToPlainText(value) {
+  const source = String(value ?? '').trim();
+  if (!source) return '';
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = sanitizeRichHtml(source);
+  wrapper.querySelectorAll('li').forEach(li => li.insertAdjacentText('beforebegin', '• '));
+  wrapper.querySelectorAll('p, li, br').forEach(el => {
+    if (el.tagName === 'BR') el.insertAdjacentText('afterend', '\n');
+    else el.insertAdjacentText('afterend', '\n');
+  });
+  return wrapper.textContent.replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function descriptionText(form, sku) {
   const retailPrice = Number(form.precio_minorista.value);
   const price = retailPrice > 0 ? `Bs ${formatNumber(retailPrice)}` : 'Consultar precio';
   const availability = Number(form.stock.value) > 0 ? 'Disponible' : 'Agotado';
   return applyTemplate(shareTemplate, {
-    nombre: form.nombre.value.trim(), descripcion: form.descripcion.value.trim(),
-    detalle: form.detalle_distintivo.value.trim(), precio: price,
+    nombre: form.nombre.value.trim(), descripcion: richHtmlToPlainText(form.descripcion.value),
+    detalle: richHtmlToPlainText(form.detalle_distintivo.value), precio: price,
     disponibilidad: availability, codigo: sku,
     enlace: new URL('../', location.href).href
   });
@@ -626,7 +724,7 @@ function applyTemplate(template, values) {
 function updateTemplatePreview() {
   const template = document.querySelector('#share-template').value;
   document.querySelector('#template-preview').textContent = applyTemplate(template, {
-    nombre:'Set Ejecutivo TOMI para Caballero', descripcion:'Un set de estilo sobrio y funcional.',
+    nombre:'Set Ejecutivo TOMI para Hombre', descripcion:'Un set de estilo sobrio y funcional.',
     detalle:'Incluye reloj de pulsera, billetera y bolígrafo.', precio:'Bs 180',
     disponibilidad:'Disponible', codigo:'GFT-M-003-NE', enlace:new URL('../', location.href).href
   });

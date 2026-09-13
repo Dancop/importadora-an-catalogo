@@ -18,3 +18,13 @@ El patrón es consistente con el funcionamiento de marketplaces que modelan un p
 
 ## Compatibilidad
 No se cambia el esquema de Supabase. Se reutilizan `imagenes` por SKU/presentación e `imagen_portada` por `codigo_modelo`.
+
+
+## Evolución v0.9.1
+
+- La portada es el estado inicial y no implica una presentación seleccionada.
+- La selección de una presentación es una acción explícita.
+- El visor ocupa toda la pantalla para maximizar el área útil de fotografía.
+- Las imágenes se contienen dentro del área disponible para preservar el producto completo.
+- En móvil las tarjetas de presentación son más compactas y dejan visible parte de la siguiente opción para comunicar que existe desplazamiento horizontal.
+- Cada presentación puede tener un enlace profundo propio, lo que permite compartir directamente una combinación concreta de producto/presentación.

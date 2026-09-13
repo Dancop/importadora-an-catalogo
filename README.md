@@ -3,7 +3,17 @@
 Sistema web para catálogo, productos, inventario, ventas, finanzas, usuarios y configuración.
 
 ## Versión actual
-**0.9.0 — Editor enriquecido y mejor UX**
+**0.9.1 — Visor a pantalla completa, selección clara y enlaces por presentación**
+
+### Novedades de v0.9.1
+- Al abrir un producto se muestra únicamente la portada; ninguna presentación queda seleccionada automáticamente.
+- Descripción y características de la presentación usan una escala tipográfica consistente.
+- El visor ocupa todo el ancho y alto disponible en escritorio y móvil.
+- Las fotografías se muestran completas mediante `object-fit: contain` para evitar recortes.
+- Las tarjetas de presentación son más compactas en móvil y dejan visible la siguiente opción.
+- Cada presentación puede compartirse mediante un enlace profundo propio.
+- Los enlaces pueden abrir directamente el producto con la presentación correspondiente seleccionada.
+- No se requiere SQL nuevo.
 
 ### Novedades de v0.9.0
 - Editor enriquecido para las descripciones de productos: negrita, cursiva, subrayado y listas.

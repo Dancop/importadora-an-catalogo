@@ -119,3 +119,10 @@ La edición se realiza exclusivamente mediante la RPC `editar_venta()`. La funci
 - `descripcion` y `detalle_distintivo` pueden almacenar HTML limitado a etiquetas de formato seguro (`strong`, `b`, `em`, `i`, `u`, `s`, `p`, `br`, `ul`, `ol`, `li`).
 - El panel administrativo sanitiza el HTML antes de guardarlo; el catálogo vuelve a sanitizarlo antes de renderizarlo.
 - No se requiere una modificación del esquema de Supabase para v0.9.0.
+
+
+## v0.9.1 — Visor a pantalla completa y enlaces por presentación
+
+El catálogo mantiene el modelo agrupado por `codigo_modelo`. Al abrir un producto se presenta primero `imagen_portada` sin seleccionar ninguna variante. Las presentaciones se activan explícitamente por el usuario y, desde ese momento, la galería utiliza exclusivamente el arreglo `imagenes` de la presentación seleccionada.
+
+La selección genera un enlace profundo usando el código del modelo y el SKU de la presentación cuando existe (`?producto=...&sku=...`). Si una presentación no tiene SKU, se utiliza su índice como respaldo (`?producto=...&presentacion=...`). Esto permite compartir o abrir directamente una presentación concreta sin duplicar productos en el catálogo.

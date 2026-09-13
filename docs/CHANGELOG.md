@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 0.9.1 — 2026-09-13
+### Changed
+- Apertura inicial del producto enfocada en la portada: ninguna presentación queda seleccionada automáticamente.
+- La presentación se activa únicamente cuando el usuario la elige.
+- Descripción y características de la presentación usan el mismo tamaño tipográfico.
+- Visor de producto a pantalla completa en escritorio y móvil, eliminando la sensación de ventana flotante y aprovechando mejor el área disponible.
+- Las fotografías de portada y de presentación se muestran con `object-fit: contain` para evitar recortes innecesarios.
+- Presentaciones más compactas en móvil para dejar visible que existen más opciones.
+- Barras de desplazamiento internas ocultas visualmente en el visor para una experiencia móvil más limpia.
+
+### Added
+- Enlaces profundos por presentación mediante `?producto=...&sku=...` o `?producto=...&presentacion=...`.
+- Al seleccionar una presentación se actualiza el enlace del navegador; el botón Compartir utiliza ese enlace específico.
+- Los enlaces de presentación pueden abrir directamente el producto con la presentación correspondiente seleccionada.
+
+### Database
+- No se requiere SQL nuevo.
+
+
 ## 0.9.0 — 2026-09-13
 
 ### Added

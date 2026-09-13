@@ -160,70 +160,103 @@ function presentationCards(product, selectedIndex) {
   }).join('');
 }
 
+function presentationUrl(product, variant, variantIndex) {
+  const url = new URL(location.href);
+  url.searchParams.set('producto', product.codigo_modelo);
+  if (variant?.sku) {
+    url.searchParams.set('sku', variant.sku);
+    url.searchParams.delete('presentacion');
+  } else {
+    url.searchParams.set('presentacion', String(variantIndex));
+    url.searchParams.delete('sku');
+  }
+  url.hash = '';
+  return url.href;
+}
+
+function updatePresentationUrl(product, variant, variantIndex) {
+  history.replaceState(null, '', presentationUrl(product, variant, variantIndex));
+}
+
+function clearPresentationUrl() {
+  const url = new URL(location.href);
+  url.searchParams.delete('producto');
+  url.searchParams.delete('sku');
+  url.searchParams.delete('presentacion');
+  history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 function galleryMarkup(items, activeVisualIndex, productName, isCover) {
   const active = items[activeVisualIndex] || items[0];
   const imageCount = items.length;
   return `<div class="gallery-stage">
     <button class="gallery-arrow gallery-prev" type="button" aria-label="Imagen anterior" ${imageCount < 2 ? 'disabled' : ''}>‹</button>
-    <img class="gallery-main-image${isCover ? ' showing-cover' : ''}" src="${escapeHtml(active.url)}" alt="${escapeHtml(productName)}">
+    <img class="gallery-main-image" src="${escapeHtml(active.url)}" alt="${escapeHtml(productName)}">
     <button class="gallery-arrow gallery-next" type="button" aria-label="Imagen siguiente" ${imageCount < 2 ? 'disabled' : ''}>›</button>
     <span class="gallery-image-counter"><span data-gallery-current>${activeVisualIndex + 1}</span>/${imageCount}</span>
+    ${isCover ? '<span class="gallery-mode-label">Portada del producto</span>' : ''}
   </div>
   <div class="visual-selector" aria-label="Fotografías de la presentación seleccionada">
     ${items.map((item,index) => `<button type="button" class="visual-thumb${index===activeVisualIndex?' active':''}" data-visual-index="${index}" aria-pressed="${index===activeVisualIndex}"><img src="${escapeHtml(item.url)}" alt=""><span>${index + 1}</span></button>`).join('')}
   </div>`;
 }
 
-function openProduct(code) {
+function openProduct(code, initialVariantIndex = null) {
   const product = groups.find(p => p.codigo_modelo === code);
   if (!product) return;
-  let selectedIndex = product.variants.findIndex(v => v.disponible && parseImages(v.imagenes).length);
-  if (selectedIndex < 0) selectedIndex = product.variants.findIndex(v => v.disponible);
-  if (selectedIndex < 0) selectedIndex = 0;
-  let galleryMode = 'cover';
+  let selectedIndex = Number.isInteger(initialVariantIndex) && initialVariantIndex >= 0 && initialVariantIndex < product.variants.length
+    ? initialVariantIndex
+    : null;
+  let galleryMode = selectedIndex != null && parseImages(product.variants[selectedIndex]?.imagenes).length ? 'variant' : 'cover';
   let activeVisualIndex = 0;
 
   const renderDialog = () => {
-    const selected = product.variants[selectedIndex] || product.variants[0];
+    const selected = selectedIndex == null ? null : product.variants[selectedIndex];
     const displayName = productDisplayName(product);
-    const selectedLabel = presentationLabel(selected);
-    const selectedPrice = showPrices && selected.precio_minorista != null ? `<strong class="selected-price">${money(selected.precio_minorista)}</strong>` : '';
-    const variantItems = variantGalleryItems(product, selectedIndex);
+    const selectedLabel = selected ? presentationLabel(selected) : '';
+    const selectedPrice = selected && showPrices && selected.precio_minorista != null ? `<strong class="selected-price">${money(selected.precio_minorista)}</strong>` : '';
+    const variantItems = selected ? variantGalleryItems(product, selectedIndex) : [];
     const items = galleryMode === 'cover'
       ? [{ type:'cover', url:productCover(product) || brandLogo, variantIndex:null }]
       : (variantItems.length ? variantItems : [{ type:'cover', url:productCover(product) || brandLogo, variantIndex:selectedIndex }]);
     if (activeVisualIndex >= items.length) activeVisualIndex = 0;
     const activeItem = items[activeVisualIndex];
     const isCover = galleryMode === 'cover';
+    const selectedSummary = selected
+      ? `<div class="selected-summary"><span>Presentación seleccionada</span><strong>${escapeHtml(selectedLabel)}</strong><small>${selected.disponible ? 'Disponible' : 'Agotado'}${selected.sku ? ` · ${escapeHtml(selected.sku)}` : ''}</small></div>`
+      : `<div class="selected-summary empty-selection"><span>Presentación</span><strong>Seleccione una presentación</strong><small>Las fotografías, precio y características se mostrarán aquí.</small></div>`;
+    const quickCharacteristics = selected
+      ? `<div class="quick-characteristics"><span><b>Exterior:</b> ${escapeHtml(String(selected.color_caja || '').replace(/^caja\s+/i,'') || 'No especificado')}</span>${selected.color_interior ? `<span><b>Interior:</b> ${escapeHtml(selected.color_interior)}</span>` : ''}${selected.piezas ? `<span><b>Incluye:</b> ${escapeHtml(selected.piezas)} artículos</span>` : ''}</div>`
+      : '';
+    const actionButtons = selected
+      ? `<a class="button whatsapp" target="_blank" rel="noopener" data-variant-whatsapp>Consultar por WhatsApp</a><button id="share-product" class="button secondary" type="button">Compartir</button>`
+      : `<button class="button whatsapp" type="button" disabled>Seleccione una presentación</button><button id="share-product" class="button secondary" type="button" disabled>Compartir</button>`;
 
     content.innerHTML = `<div class="dialog-gallery">
         ${galleryMarkup(items, activeVisualIndex, displayName, isCover)}
         <section class="presentation-selector" aria-label="Presentaciones del producto">
-          <div class="presentation-selector-heading"><div><span>Presentaciones</span><small>Selecciona una para ver sus fotografías y detalles</small></div><strong>${product.variants.length}</strong></div>
+          <div class="presentation-selector-heading"><div><span>Presentaciones</span><small>Seleccione una para ver sus fotografías y detalles</small></div><strong>${product.variants.length}</strong></div>
           <div class="presentation-cards">${presentationCards(product, selectedIndex)}</div>
         </section>
       </div>
       <div class="dialog-details">
         <div class="first-screen-summary">
           <div class="dialog-product-heading"><p class="eyebrow">${escapeHtml(product.categoria)}</p><h2>${escapeHtml(displayName)}</h2>${selectedPrice}</div>
-          <div class="selected-summary"><span>Presentación seleccionada</span><strong>${escapeHtml(selectedLabel)}</strong><small>${selected.disponible ? 'Disponible' : 'Agotado'}${selected.sku ? ` · ${escapeHtml(selected.sku)}` : ''}</small></div>
-          <div class="quick-characteristics"><span><b>Exterior:</b> ${escapeHtml(String(selected.color_caja || '').replace(/^caja\s+/i,'') || 'No especificado')}</span>${selected.color_interior ? `<span><b>Interior:</b> ${escapeHtml(selected.color_interior)}</span>` : ''}${selected.piezas ? `<span><b>Incluye:</b> ${escapeHtml(selected.piezas)} artículos</span>` : ''}</div>
+          ${selectedSummary}
+          ${quickCharacteristics}
         </div>
         <section class="dialog-description">
           <details open><summary>Descripción</summary><div class="rich-content">${sanitizeRichHtml(product.descripcion)}</div></details>
-          ${selected.detalle_distintivo ? `<details open><summary>Características de esta presentación</summary><div class="rich-content variant-detail">${sanitizeRichHtml(selected.detalle_distintivo)}</div></details>` : ''}
+          ${selected?.detalle_distintivo ? `<details open><summary>Características de esta presentación</summary><div class="rich-content variant-detail">${sanitizeRichHtml(selected.detalle_distintivo)}</div></details>` : ''}
         </section>
-        <div class="dialog-actions"><a class="button whatsapp" target="_blank" rel="noopener" data-variant-whatsapp>Consultar por WhatsApp</a><button id="share-product" class="button secondary" type="button">Compartir</button></div>
+        <div class="dialog-actions">${actionButtons}</div>
       </div>`;
 
     const chooseVisual = index => {
       if (index < 0 || index >= items.length) return;
       activeVisualIndex = index;
       const image = content.querySelector('.gallery-main-image');
-      if (image) {
-        image.src = items[index].url;
-        image.classList.toggle('showing-cover', galleryMode === 'cover');
-      }
+      if (image) image.src = items[index].url;
       content.querySelectorAll('[data-visual-index]').forEach(button => {
         const active = Number(button.dataset.visualIndex) === index;
         button.classList.toggle('active', active);
@@ -239,6 +272,7 @@ function openProduct(code) {
       selectedIndex = index;
       galleryMode = parseImages(nextVariant.imagenes).length ? 'variant' : 'cover';
       activeVisualIndex = 0;
+      updatePresentationUrl(product, nextVariant, index);
       renderDialog();
       requestAnimationFrame(() => content.querySelector(`.presentation-card[data-variant-index="${selectedIndex}"]`)?.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'}));
     };
@@ -256,20 +290,24 @@ function openProduct(code) {
       if (Math.abs(delta) > 45 && items.length > 1) chooseVisual((activeVisualIndex + (delta < 0 ? 1 : -1) + items.length) % items.length);
     }, {passive:true});
 
-    const whatsappText = `Hola, quisiera consultar por ${displayName}, presentación ${selectedLabel}${selected.sku ? ` (${selected.sku})` : ''}.`;
-    content.querySelector('[data-variant-whatsapp]').href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(whatsappText)}`;
-    content.querySelector('#share-product')?.addEventListener('click', () => shareProduct({ ...product, nombre: displayName }, selected, activeItem.url));
+    if (selected) {
+      const whatsappText = `Hola, quisiera consultar por ${displayName}, presentación ${selectedLabel}${selected.sku ? ` (${selected.sku})` : ''}.`;
+      content.querySelector('[data-variant-whatsapp]').href = `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(whatsappText)}`;
+      content.querySelector('#share-product')?.addEventListener('click', () => shareProduct({ ...product, nombre: displayName }, selected, activeItem.url, presentationUrl(product, selected, selectedIndex)));
+    }
   };
 
   renderDialog();
   dialog.showModal();
+  document.documentElement.classList.add('product-modal-open');
+  document.body.classList.add('product-modal-open');
 }
 
-async function shareProduct(product, variant, imageUrl) {
+async function shareProduct(product, variant, imageUrl, shareUrl = location.href) {
   const priceText = showPrices && variant.precio_minorista != null ? money(variant.precio_minorista) : 'Consultar por WhatsApp';
   const available = variant.disponible ? 'Disponible' : 'Agotado';
   const presentation = [variant.color_caja ? `Exterior: ${String(variant.color_caja).replace(/^caja\s+/i, '')}` : '', variant.color_interior ? `Interior: ${variant.color_interior}` : ''].filter(Boolean).join('\n');
-  const text = applyTemplate(shareTemplate, { nombre: product.nombre, descripcion: richTextForShare(product.descripcion), detalle: [presentation, richTextForShare(variant.detalle_distintivo)].filter(Boolean).join('\n'), precio: priceText, disponibilidad: available, codigo: variant.sku || product.codigo_modelo, enlace: location.href });
+  const text = applyTemplate(shareTemplate, { nombre: product.nombre, descripcion: richTextForShare(product.descripcion), detalle: [presentation, richTextForShare(variant.detalle_distintivo)].filter(Boolean).join('\n'), precio: priceText, disponibilidad: available, codigo: variant.sku || product.codigo_modelo, enlace: shareUrl });
   if (navigator.share && imageUrl) {
     try {
       const response = await fetch(imageUrl); const blob = await response.blob();
@@ -289,6 +327,11 @@ function applyTemplate(template, values) {
 
 dialog.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+dialog.addEventListener('close', () => {
+  document.documentElement.classList.remove('product-modal-open');
+  document.body.classList.remove('product-modal-open');
+  clearPresentationUrl();
+});
 document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('.filter').forEach(b => b.classList.remove('active')); button.classList.add('active'); render(button.dataset.filter); }));
 
 async function load() {
@@ -304,6 +347,19 @@ async function load() {
     companyName = config?.nombre_empresa?.trim() || 'Importadora A&N';
     brandLogo = config?.logo_url || './assets/logo.png';
     applyBrand(); groups = groupProducts(data || []); render(); status.hidden = true;
+    const params = new URLSearchParams(location.search);
+    const deepLinkCode = params.get('producto');
+    const deepLinkSku = params.get('sku');
+    const deepLinkIndex = params.get('presentacion');
+    if (deepLinkCode) {
+      const linkedProduct = groups.find(p => p.codigo_modelo === deepLinkCode);
+      if (linkedProduct) {
+        let linkedIndex = null;
+        if (deepLinkSku) linkedIndex = linkedProduct.variants.findIndex(v => String(v.sku || '') === deepLinkSku);
+        if (linkedIndex == null || linkedIndex < 0) linkedIndex = /^\d+$/.test(deepLinkIndex || '') ? Number(deepLinkIndex) : null;
+        openProduct(deepLinkCode, linkedIndex >= 0 ? linkedIndex : null);
+      }
+    }
   } catch (error) {
     console.error('Error al cargar el catálogo:', error);
     status.hidden = false; status.textContent = 'No pudimos cargar el catálogo. Actualiza la página para intentarlo nuevamente.';

@@ -3,7 +3,14 @@
 Sistema web para catálogo, productos, inventario, ventas, finanzas, usuarios y configuración.
 
 ## Versión actual
-**0.9.1 — Visor a pantalla completa, selección clara y enlaces por presentación**
+**0.9.2 — Navegación continua de galería y catálogo más limpio**
+
+### Novedades de v0.9.2
+- La galería se recorre de forma continua: portada → fotografías de la primera presentación → fotografías de la siguiente presentación.
+- Las flechas y el gesto lateral usan la misma navegación.
+- Las flechas están disponibles también en móvil.
+- Se eliminan las etiquetas redundantes de disponibilidad del catálogo y del selector de presentaciones.
+- No se requiere SQL nuevo.
 
 ### Novedades de v0.9.1
 - Al abrir un producto se muestra únicamente la portada; ninguna presentación queda seleccionada automáticamente.

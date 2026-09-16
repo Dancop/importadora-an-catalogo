@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 0.9.2 — 2026-09-16
+### Changed
+- La navegación de la galería ahora conecta la portada con las presentaciones en una secuencia continua.
+- Desde la portada, **Siguiente** entra directamente en la primera fotografía de la primera presentación.
+- Al recorrer las fotografías de una presentación, **Siguiente** continúa automáticamente con la primera fotografía de la siguiente presentación.
+- **Anterior** realiza el recorrido inverso y desde la primera presentación vuelve a la portada.
+- El mismo comportamiento se aplica a las flechas y al gesto de deslizamiento lateral.
+- Las flechas de navegación permanecen visibles también en móvil.
+- Se eliminó la etiqueta **Disponible** de las tarjetas del catálogo, ya que el catálogo público solo muestra productos disponibles.
+- También se eliminaron indicadores redundantes de disponibilidad dentro del selector y resumen de la presentación.
+
+### Database
+- No se requiere SQL nuevo.
+
 ## 0.9.1 — 2026-09-13
 ### Changed
 - Apertura inicial del producto enfocada en la portada: ninguna presentación queda seleccionada automáticamente.

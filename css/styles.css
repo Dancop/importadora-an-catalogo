@@ -873,6 +873,10 @@ body.product-modal-open { overflow:hidden; }
     border-radius:0;
   }
   .gallery-mode-label { left:12px; right:auto; bottom:10px; font-size:.66rem; }
+  /* Las flechas también están disponibles en móvil; el gesto lateral funciona como alternativa. */
+  .gallery-arrow { display:grid; width:40px; height:40px; }
+  .gallery-prev { left:10px; }
+  .gallery-next { right:10px; }
   .visual-selector { padding:0 12px 4px; margin:0; }
   .presentation-selector { padding:0 12px 2px; }
   .presentation-cards { padding:2px 0 6px; gap:8px; }

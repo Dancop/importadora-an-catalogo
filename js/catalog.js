@@ -92,7 +92,6 @@ function cover(product) {
 }
 
 function card(product) {
-  const available = product.variants.some(v => v.disponible);
   const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
   const displayName = productDisplayName(product);
   const countBadge = product.variants.length > 1 ? `<span class="variant-count">${product.variants.length} presentaciones</span>` : '';
@@ -100,7 +99,7 @@ function card(product) {
   const bottom = showPrices
     ? `<div class="card-bottom"><strong>${prices.length ? money(Math.min(...prices)) : 'Consultar precio'}</strong><button class="text-button" type="button">${action}</button></div>`
     : `<div class="card-bottom price-hidden"><button class="text-button catalog-cta" type="button">${action}</button></div>`;
-  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}"><div class="product-image">${cover(product)}<span class="availability ${available ? '' : 'out'}">${available ? 'Disponible' : 'Agotado'}</span>${countBadge}</div><div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(displayName)}</h3><div class="summary rich-summary">${sanitizeRichHtml(product.descripcion)}</div>${bottom}</div></article>`;
+  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}"><div class="product-image">${cover(product)}${countBadge}</div><div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(displayName)}</h3><div class="summary rich-summary">${sanitizeRichHtml(product.descripcion)}</div>${bottom}</div></article>`;
 }
 
 function render(filter = 'Todos') {
@@ -154,7 +153,7 @@ function presentationCards(product, selectedIndex) {
     const label = presentationLabel(variant);
     return `<button type="button" class="presentation-card${variantIndex === selectedIndex ? ' active' : ''}" data-variant-index="${variantIndex}" aria-pressed="${variantIndex === selectedIndex}">
       <img src="${escapeHtml(thumb)}" alt="">
-      <span class="presentation-card-copy"><strong>${escapeHtml(label)}</strong><small>${variant.disponible ? 'Disponible' : 'Agotado'}${images.length > 1 ? ` · ${images.length} fotos` : ''}</small></span>
+      <span class="presentation-card-copy"><strong>${escapeHtml(label)}</strong><small>${images.length > 1 ? `${images.length} fotos` : '1 foto'}</small></span>
       <span class="presentation-selected" aria-hidden="true">✓</span>
     </button>`;
   }).join('');
@@ -186,13 +185,14 @@ function clearPresentationUrl() {
   history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
-function galleryMarkup(items, activeVisualIndex, productName, isCover) {
+function galleryMarkup(items, activeVisualIndex, productName, isCover, hasPresentationNavigation) {
   const active = items[activeVisualIndex] || items[0];
   const imageCount = items.length;
+  const arrowsDisabled = !hasPresentationNavigation && imageCount < 2;
   return `<div class="gallery-stage">
-    <button class="gallery-arrow gallery-prev" type="button" aria-label="Imagen anterior" ${imageCount < 2 ? 'disabled' : ''}>‹</button>
+    <button class="gallery-arrow gallery-prev" type="button" aria-label="Anterior" ${arrowsDisabled ? 'disabled' : ''}>‹</button>
     <img class="gallery-main-image" src="${escapeHtml(active.url)}" alt="${escapeHtml(productName)}">
-    <button class="gallery-arrow gallery-next" type="button" aria-label="Imagen siguiente" ${imageCount < 2 ? 'disabled' : ''}>›</button>
+    <button class="gallery-arrow gallery-next" type="button" aria-label="Siguiente" ${arrowsDisabled ? 'disabled' : ''}>›</button>
     <span class="gallery-image-counter"><span data-gallery-current>${activeVisualIndex + 1}</span>/${imageCount}</span>
     ${isCover ? '<span class="gallery-mode-label">Portada del producto</span>' : ''}
   </div>
@@ -223,7 +223,7 @@ function openProduct(code, initialVariantIndex = null) {
     const activeItem = items[activeVisualIndex];
     const isCover = galleryMode === 'cover';
     const selectedSummary = selected
-      ? `<div class="selected-summary"><span>Presentación seleccionada</span><strong>${escapeHtml(selectedLabel)}</strong><small>${selected.disponible ? 'Disponible' : 'Agotado'}${selected.sku ? ` · ${escapeHtml(selected.sku)}` : ''}</small></div>`
+      ? `<div class="selected-summary"><span>Presentación seleccionada</span><strong>${escapeHtml(selectedLabel)}</strong>${selected.sku ? `<small>${escapeHtml(selected.sku)}</small>` : ''}</div>`
       : `<div class="selected-summary empty-selection"><span>Presentación</span><strong>Seleccione una presentación</strong><small>Las fotografías, precio y características se mostrarán aquí.</small></div>`;
     const quickCharacteristics = selected
       ? `<div class="quick-characteristics"><span><b>Exterior:</b> ${escapeHtml(String(selected.color_caja || '').replace(/^caja\s+/i,'') || 'No especificado')}</span>${selected.color_interior ? `<span><b>Interior:</b> ${escapeHtml(selected.color_interior)}</span>` : ''}${selected.piezas ? `<span><b>Incluye:</b> ${escapeHtml(selected.piezas)} artículos</span>` : ''}</div>`
@@ -233,7 +233,7 @@ function openProduct(code, initialVariantIndex = null) {
       : `<button class="button whatsapp" type="button" disabled>Seleccione una presentación</button><button id="share-product" class="button secondary" type="button" disabled>Compartir</button>`;
 
     content.innerHTML = `<div class="dialog-gallery">
-        ${galleryMarkup(items, activeVisualIndex, displayName, isCover)}
+        ${galleryMarkup(items, activeVisualIndex, displayName, isCover, product.variants.length > 0)}
         <section class="presentation-selector" aria-label="Presentaciones del producto">
           <div class="presentation-selector-heading"><div><span>Presentaciones</span><small>Seleccione una para ver sus fotografías y detalles</small></div><strong>${product.variants.length}</strong></div>
           <div class="presentation-cards">${presentationCards(product, selectedIndex)}</div>
@@ -279,15 +279,74 @@ function openProduct(code, initialVariantIndex = null) {
 
     content.querySelectorAll('[data-variant-index]').forEach(button => button.addEventListener('click', () => chooseVariant(Number(button.dataset.variantIndex))));
     content.querySelectorAll('[data-visual-index]').forEach(button => button.addEventListener('click', () => chooseVisual(Number(button.dataset.visualIndex))));
-    content.querySelector('.gallery-prev')?.addEventListener('click', () => chooseVisual((activeVisualIndex - 1 + items.length) % items.length));
-    content.querySelector('.gallery-next')?.addEventListener('click', () => chooseVisual((activeVisualIndex + 1) % items.length));
+
+    // Navegación continua: portada → fotos de presentación 1 → presentación 2 → … → portada.
+    // Al llegar al final de una presentación, Siguiente entra en la primera foto de la siguiente.
+    // Al retroceder desde la primera foto, Anterior entra en la última foto de la presentación anterior.
+    const navigateGallery = direction => {
+      if (galleryMode === 'cover') {
+        if (direction > 0 && product.variants.length) {
+          chooseVariant(0);
+        } else if (direction < 0 && product.variants.length) {
+          const lastIndex = product.variants.length - 1;
+          const lastImages = parseImages(product.variants[lastIndex].imagenes);
+          chooseVariant(lastIndex);
+          if (lastImages.length > 1) {
+            // chooseVariant inicia en la primera; mover a la última después del render.
+            requestAnimationFrame(() => chooseVisual(lastImages.length - 1));
+          }
+        }
+        return;
+      }
+
+      const images = parseImages(product.variants[selectedIndex]?.imagenes);
+      if (direction > 0) {
+        if (activeVisualIndex < images.length - 1) {
+          chooseVisual(activeVisualIndex + 1);
+          return;
+        }
+        const nextIndex = selectedIndex + 1;
+        if (nextIndex < product.variants.length) {
+          chooseVariant(nextIndex);
+        } else {
+          // Desde la última foto de la última presentación, volver a la portada.
+          selectedIndex = null;
+          galleryMode = 'cover';
+          activeVisualIndex = 0;
+          clearPresentationUrl();
+          renderDialog();
+        }
+      } else {
+        if (activeVisualIndex > 0) {
+          chooseVisual(activeVisualIndex - 1);
+          return;
+        }
+        const previousIndex = selectedIndex - 1;
+        if (previousIndex >= 0) {
+          const previousImages = parseImages(product.variants[previousIndex].imagenes);
+          chooseVariant(previousIndex);
+          if (previousImages.length > 1) {
+            requestAnimationFrame(() => chooseVisual(previousImages.length - 1));
+          }
+        } else {
+          selectedIndex = null;
+          galleryMode = 'cover';
+          activeVisualIndex = 0;
+          clearPresentationUrl();
+          renderDialog();
+        }
+      }
+    };
+
+    content.querySelector('.gallery-prev')?.addEventListener('click', () => navigateGallery(-1));
+    content.querySelector('.gallery-next')?.addEventListener('click', () => navigateGallery(1));
 
     let touchStartX = 0;
     const stage = content.querySelector('.gallery-stage');
     stage?.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, {passive:true});
     stage?.addEventListener('touchend', e => {
       const delta = e.changedTouches[0].clientX - touchStartX;
-      if (Math.abs(delta) > 45 && items.length > 1) chooseVisual((activeVisualIndex + (delta < 0 ? 1 : -1) + items.length) % items.length);
+      if (Math.abs(delta) > 45) navigateGallery(delta < 0 ? 1 : -1);
     }, {passive:true});
 
     if (selected) {

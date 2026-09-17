@@ -690,7 +690,7 @@
 .presentation-card-copy small { color:var(--muted); font-size:.65rem; line-height:1.2; }
 .presentation-selected { display:none; position:absolute; right:7px; top:50%; transform:translateY(-50%); width:21px; height:21px; place-items:center; border-radius:50%; background:var(--navy); color:#fff; font-size:.65rem; font-weight:900; }
 .presentation-card.active .presentation-selected { display:grid; }
-.dialog-description .rich-content { padding:0 16px 16px; color:var(--muted); }
+.dialog-description .rich-content { padding:10px 16px 16px; color:var(--muted); }
 .dialog-description .rich-content p { margin:0 0 8px; }
 .dialog-description .rich-content p:last-child { margin-bottom:0; }
 .dialog-description .rich-content ul,
@@ -709,7 +709,7 @@
   .presentation-card { flex-basis:72vw; min-width:0; }
   .presentation-selector { padding:0 12px 2px; }
   .presentation-selector-heading small { font-size:.68rem; }
-  .dialog-description .rich-content { padding:0 14px 14px; }
+  .dialog-description .rich-content { padding:10px 14px 14px; }
   .dialog-actions { position:sticky; left:auto; right:auto; bottom:0; margin:0 -14px; padding:10px 14px calc(10px + env(safe-area-inset-bottom)); background:#fff; border-top:1px solid var(--line); box-shadow:0 -8px 24px rgba(7,29,45,.1); z-index:8; }
 }
 

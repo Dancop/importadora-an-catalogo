@@ -137,7 +137,31 @@ function sanitizeRichHtml(value) {
 function richTextForShare(value) {
   const div = document.createElement('div');
   div.innerHTML = sanitizeRichHtml(value);
-  return (div.innerText || div.textContent || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+
+  const render = node => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.nodeValue.replace(/\u00a0/g, ' ');
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+    const tag = node.tagName;
+    const content = [...node.childNodes].map(render).join('');
+
+    if (tag === 'BR') return '\n';
+    if (tag === 'LI') return `• ${content.trim()}\n`;
+    if (tag === 'P') return `${content.trim()}\n\n`;
+    if (tag === 'UL' || tag === 'OL') return `${content}\n`;
+    if (tag === 'STRONG' || tag === 'B') return content.trim() ? `*${content.trim()}*` : '';
+    if (tag === 'EM' || tag === 'I') return content.trim() ? `_${content.trim()}_` : '';
+    if (tag === 'S') return content.trim() ? `~${content.trim()}~` : '';
+    return content;
+  };
+
+  return render(div)
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 function variantGalleryItems(product, variantIndex) {
   const variant = product.variants[variantIndex];
@@ -206,7 +230,7 @@ function openProduct(code, initialVariantIndex = null) {
   if (!product) return;
   let selectedIndex = Number.isInteger(initialVariantIndex) && initialVariantIndex >= 0 && initialVariantIndex < product.variants.length
     ? initialVariantIndex
-    : null;
+    : (product.variants.length ? 0 : null);
   let galleryMode = selectedIndex != null && parseImages(product.variants[selectedIndex]?.imagenes).length ? 'variant' : 'cover';
   let activeVisualIndex = 0;
 
@@ -365,8 +389,7 @@ function openProduct(code, initialVariantIndex = null) {
 async function shareProduct(product, variant, imageUrl, shareUrl = location.href) {
   const priceText = showPrices && variant.precio_minorista != null ? money(variant.precio_minorista) : 'Consultar por WhatsApp';
   const available = variant.disponible ? 'Disponible' : 'Agotado';
-  const presentation = [variant.color_caja ? `Exterior: ${String(variant.color_caja).replace(/^caja\s+/i, '')}` : '', variant.color_interior ? `Interior: ${variant.color_interior}` : ''].filter(Boolean).join('\n');
-  const text = applyTemplate(shareTemplate, { nombre: product.nombre, descripcion: richTextForShare(product.descripcion), detalle: [presentation, richTextForShare(variant.detalle_distintivo)].filter(Boolean).join('\n'), precio: priceText, disponibilidad: available, codigo: variant.sku || product.codigo_modelo, enlace: shareUrl });
+  const text = applyTemplate(shareTemplate, { nombre: product.nombre, descripcion: richTextForShare(product.descripcion), detalle: richTextForShare(variant.detalle_distintivo), precio: priceText, disponibilidad: available, codigo: variant.sku || product.codigo_modelo, enlace: shareUrl });
   if (navigator.share && imageUrl) {
     try {
       const response = await fetch(imageUrl); const blob = await response.blob();

@@ -2,8 +2,8 @@
 ===========================================
 Importadora A&N
 Módulo: Generador de Catálogo en PDF
-Descripción: Renderiza el catálogo imprimible/digital
-en formato A4 con portada y fichas de producto.
+Descripción: Renderiza el catálogo optimizado para móvil
+en formato A4 (1 producto por página, foto destacada).
 ===========================================
 */
 
@@ -103,7 +103,7 @@ async function buildAndOpenPdf() {
   const originalBtnText = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Generando catálogo PDF…';
-  if (msg) msg.textContent = 'Procesando imágenes y creando páginas…';
+  if (msg) msg.textContent = 'Procesando imágenes en alta resolución…';
 
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -111,9 +111,9 @@ async function buildAndOpenPdf() {
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
 
-    // ----------------------------------------
+    // ==========================================
     // PÁGINA 1: PORTADA
-    // ----------------------------------------
+    // ==========================================
     doc.setFillColor(24, 24, 27); // Fondo oscuro #18181b
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
@@ -145,113 +145,134 @@ async function buildAndOpenPdf() {
     doc.setTextColor(180, 180, 180);
     doc.text(`Edición: ${fecha}`, pageWidth / 2, 142, { align: 'center' });
 
-    // ----------------------------------------
-    // PÁGINAS DE PRODUCTOS (2 por página)
-    // ----------------------------------------
-    const itemsPerPage = 2;
+    // ==========================================
+    // PÁGINAS DE PRODUCTOS (1 producto por página)
+    // ==========================================
     for (let i = 0; i < items.length; i++) {
-      const pos = i % itemsPerPage;
-      if (pos === 0) {
-        doc.addPage();
-        doc.setFillColor(245, 245, 247);
-        doc.rect(0, 0, pageWidth, 18, 'F');
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(80, 80, 80);
-        doc.text(currentConfig.nombre_empresa || 'IMPORTADORA A&N', margin, 12);
-        doc.setFont('helvetica', 'normal');
-        doc.text(fecha, pageWidth - margin, 12, { align: 'right' });
-      }
-
+      doc.addPage();
       const prod = items[i];
-      const y = pos === 0 ? 26 : 154;
-      const cardHeight = 118;
 
-      // Tarjeta contenedora
-      doc.setDrawColor(225, 225, 230);
+      // Encabezado superior
+      doc.setFillColor(245, 245, 247);
+      doc.rect(0, 0, pageWidth, 18, 'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(80, 80, 80);
+      doc.text(currentConfig.nombre_empresa || 'IMPORTADORA A&N', margin, 12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(fecha, pageWidth - margin, 12, { align: 'right' });
+
+      // Tarjeta contenedora de página completa
+      const cardY = 24;
+      const cardWidth = pageWidth - (margin * 2); // 180 mm
+      const cardHeight = 254;
+
+      doc.setDrawColor(228, 228, 231);
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(margin, y, pageWidth - (margin * 2), cardHeight, 3, 3, 'FD');
+      doc.roundedRect(margin, cardY, cardWidth, cardHeight, 4, 4, 'FD');
 
-      // Imagen: Primera foto propia de la presentación -> Portada del modelo
+      // 1. Fotografía grande de la presentación (130 x 130 mm)
+      const imgSize = 130;
+      const imgX = (pageWidth - imgSize) / 2;
+      const imgY = cardY + 8;
+
+      // Base suave para encuadrar la imagen
+      doc.setFillColor(250, 250, 252);
+      doc.roundedRect(imgX - 2, imgY - 2, imgSize + 4, imgSize + 4, 2, 2, 'F');
+
       const fotosPresentacion = parseImages(prod.imagenes);
       const imgUrl = fotosPresentacion[0] || prod.imagen_portada || null;
       const imgBase64 = await urlToBase64(imgUrl);
 
       if (imgBase64) {
         try {
-          doc.addImage(imgBase64, 'JPEG', margin + 6, y + 9, 62, 62);
+          doc.addImage(imgBase64, 'JPEG', imgX, imgY, imgSize, imgSize);
         } catch (_) {
-          doc.rect(margin + 6, y + 9, 62, 62);
+          doc.rect(imgX, imgY, imgSize, imgSize);
         }
       } else {
         doc.setDrawColor(220, 220, 220);
-        doc.rect(margin + 6, y + 9, 62, 62);
-        doc.setFontSize(9);
+        doc.rect(imgX, imgY, imgSize, imgSize);
+        doc.setFontSize(10);
         doc.setTextColor(160, 160, 160);
-        doc.text('Sin imagen', margin + 22, y + 42);
+        doc.text('Fotografía no disponible', pageWidth / 2, imgY + (imgSize / 2), { align: 'center' });
       }
 
-      // Columna de datos
-      const colX = margin + 74;
-      const colWidth = pageWidth - colX - margin - 4;
-      let textY = y + 16;
+      // 2. Información del producto debajo de la imagen
+      const textWidth = cardWidth - 24; // 156 mm
+      let textY = imgY + imgSize + 9;
 
-      // Nombre
+      // Nombre del producto
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
-      doc.setTextColor(25, 25, 25);
-      const nameLines = doc.splitTextToSize(prod.nombre || 'Producto', colWidth);
-      doc.text(nameLines, colX, textY);
-      textY += (nameLines.length * 6) + 3;
+      doc.setFontSize(15);
+      doc.setTextColor(24, 24, 27);
+      const nameLines = doc.splitTextToSize(prod.nombre || 'Producto', textWidth);
+      doc.text(nameLines, pageWidth / 2, textY, { align: 'center' });
+      textY += (nameLines.length * 6.5) + 2;
 
-      // SKU y Modelo
+      // SKU y Código de modelo
       if (options.includeSku) {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Código: ${prod.codigo_modelo || 'N/A'} | SKU: ${prod.sku}`, colX, textY);
-        textY += 7;
+        doc.setFontSize(10);
+        doc.setTextColor(113, 113, 122);
+        const codeTxt = `Modelo: ${prod.codigo_modelo || 'N/A'}   |   SKU: ${prod.sku}`;
+        doc.text(codeTxt, pageWidth / 2, textY, { align: 'center' });
+        textY += 6;
       }
 
-      // Descripción (sin etiquetas HTML ni &nbsp;)
+      // Línea divisoria decorativa
+      doc.setDrawColor(235, 235, 240);
+      doc.setLineWidth(0.4);
+      doc.line(pageWidth / 2 - 25, textY, pageWidth / 2 + 25, textY);
+      textY += 6;
+
+      // Descripción comercial (limpia de HTML)
       if (options.includeDescription && prod.descripcion) {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(9.5);
+        doc.setTextColor(82, 82, 91);
         const descPlain = cleanHtmlText(prod.descripcion);
-        const descLines = doc.splitTextToSize(descPlain, colWidth);
-        doc.text(descLines.slice(0, 4), colX, textY);
-        textY += (Math.min(descLines.length, 4) * 4.5) + 4;
+        const descLines = doc.splitTextToSize(descPlain, textWidth);
+        doc.text(descLines.slice(0, 3), pageWidth / 2, textY, { align: 'center' });
+        textY += (Math.min(descLines.length, 3) * 5) + 3;
       }
 
-      // Detalle distintivo / Incluye (sin etiquetas HTML ni &nbsp;)
+      // Detalle distintivo / Lo que incluye
       if (options.includeDetail && prod.detalle_distintivo) {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(70, 70, 70);
+        doc.setFontSize(9.5);
+        doc.setTextColor(63, 63, 70);
         const detPlain = cleanHtmlText(prod.detalle_distintivo);
-        const detLines = doc.splitTextToSize(`Incluye: ${detPlain}`, colWidth);
-        doc.text(detLines.slice(0, 3), colX, textY);
-        textY += (Math.min(detLines.length, 3) * 4.5) + 4;
+        const detLines = doc.splitTextToSize(`Incluye: ${detPlain}`, textWidth);
+        doc.text(detLines.slice(0, 2), pageWidth / 2, textY, { align: 'center' });
+        textY += (Math.min(detLines.length, 2) * 5) + 3;
       }
 
-      // Precio y Disponibilidad
+      // 3. Franja inferior: Precio y Estado de disponibilidad
+      const bottomY = cardY + cardHeight - 12;
+
       if (options.includePrice && prod.precio_minorista) {
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(13);
+        doc.setFontSize(16);
         doc.setTextColor(185, 28, 28);
-        doc.text(`Bs ${Number(prod.precio_minorista).toFixed(2)}`, colX, y + 104);
+        doc.text(`Bs ${Number(prod.precio_minorista).toFixed(2)}`, margin + 12, bottomY);
       }
 
       if (options.includeStock) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(90, 90, 90);
-        const stockTxt = (prod.stock > 0 || prod.disponible) ? '✓ Disponible' : 'Agotado';
-        doc.text(stockTxt, pageWidth - margin - 6, y + 104, { align: 'right' });
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        const isAvailable = (prod.stock > 0 || prod.disponible);
+        if (isAvailable) {
+          doc.setTextColor(22, 101, 52); // Verde
+          doc.text('● Disponible', pageWidth - margin - 12, bottomY, { align: 'right' });
+        } else {
+          doc.setTextColor(150, 150, 150);
+          doc.text('Agotado', pageWidth - margin - 12, bottomY, { align: 'right' });
+        }
       }
 
-      // Numeración
+      // Numeración de página
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(160, 160, 160);
       doc.text(`Página ${doc.internal.getNumberOfPages()}`, pageWidth / 2, pageHeight - 6, { align: 'center' });

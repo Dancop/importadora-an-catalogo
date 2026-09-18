@@ -11,7 +11,33 @@ let currentProducts = [];
 let currentConfig = {};
 let isListenerAttached = false;
 
-// Helper para convertir imágenes a Base64 sin detener la ejecución ante fallos
+// Limpia etiquetas HTML y decodifica entidades como &nbsp;, &amp;, etc.
+function cleanHtmlText(value) {
+  if (!value) return '';
+  const doc = new DOMParser().parseFromString(value, 'text/html');
+  const text = doc.body.textContent || '';
+  return text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Procesa las imágenes de la presentación (array nativo o string JSON)
+function parseImages(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return value ? [value] : [];
+    }
+  }
+  return [];
+}
+
+// Convierte imágenes a Base64 sin detener la ejecución ante fallos
 async function urlToBase64(url) {
   if (!url) return null;
   try {
@@ -88,10 +114,9 @@ async function buildAndOpenPdf() {
     // ----------------------------------------
     // PÁGINA 1: PORTADA
     // ----------------------------------------
-    doc.setFillColor(24, 24, 27); // Gris oscuro elegante (#18181b)
+    doc.setFillColor(24, 24, 27); // Fondo oscuro #18181b
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-    // Logo de la empresa en portada si existe
     if (currentConfig.logo_url) {
       const logoBase64 = await urlToBase64(currentConfig.logo_url);
       if (logoBase64) {
@@ -101,7 +126,7 @@ async function buildAndOpenPdf() {
       }
     }
 
-    doc.setTextColor(212, 175, 55); // Dorado suave (#D4AF37)
+    doc.setTextColor(212, 175, 55); // Dorado #D4AF37
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(26);
     doc.text(currentConfig.nombre_empresa || 'IMPORTADORA A&N', pageWidth / 2, 110, { align: 'center' });
@@ -128,7 +153,6 @@ async function buildAndOpenPdf() {
       const pos = i % itemsPerPage;
       if (pos === 0) {
         doc.addPage();
-        // Encabezado de página
         doc.setFillColor(245, 245, 247);
         doc.rect(0, 0, pageWidth, 18, 'F');
         doc.setFontSize(9);
@@ -148,9 +172,11 @@ async function buildAndOpenPdf() {
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(margin, y, pageWidth - (margin * 2), cardHeight, 3, 3, 'FD');
 
-      // Imagen del producto
-      const imgUrl = prod.imagen_portada || (prod.imagenes && prod.imagenes[0]);
+      // Imagen: Primera foto propia de la presentación -> Portada del modelo
+      const fotosPresentacion = parseImages(prod.imagenes);
+      const imgUrl = fotosPresentacion[0] || prod.imagen_portada || null;
       const imgBase64 = await urlToBase64(imgUrl);
+
       if (imgBase64) {
         try {
           doc.addImage(imgBase64, 'JPEG', margin + 6, y + 9, 62, 62);
@@ -176,7 +202,7 @@ async function buildAndOpenPdf() {
       doc.setTextColor(25, 25, 25);
       const nameLines = doc.splitTextToSize(prod.nombre || 'Producto', colWidth);
       doc.text(nameLines, colX, textY);
-      textY += (nameLines.length * 6) + 2;
+      textY += (nameLines.length * 6) + 3;
 
       // SKU y Modelo
       if (options.includeSku) {
@@ -184,39 +210,32 @@ async function buildAndOpenPdf() {
         doc.setFontSize(9.5);
         doc.setTextColor(100, 100, 100);
         doc.text(`Código: ${prod.codigo_modelo || 'N/A'} | SKU: ${prod.sku}`, colX, textY);
-        textY += 6;
+        textY += 7;
       }
 
-      // Variante / Color
-      if (prod.color_caja || prod.color_interior) {
-        doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80);
-        const colTxt = `Color: ${[prod.color_caja, prod.color_interior ? `Interior ${prod.color_interior}` : ''].filter(Boolean).join(' · ')}`;
-        doc.text(colTxt, colX, textY);
-        textY += 6;
-      }
-
-      // Descripción
+      // Descripción (sin etiquetas HTML ni &nbsp;)
       if (options.includeDescription && prod.descripcion) {
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
-        doc.setTextColor(110, 110, 110);
-        const descPlain = prod.descripcion.replace(/<[^>]*>/g, '').trim();
+        doc.setTextColor(100, 100, 100);
+        const descPlain = cleanHtmlText(prod.descripcion);
         const descLines = doc.splitTextToSize(descPlain, colWidth);
-        doc.text(descLines.slice(0, 3), colX, textY);
-        textY += (Math.min(descLines.length, 3) * 4.5) + 3;
+        doc.text(descLines.slice(0, 4), colX, textY);
+        textY += (Math.min(descLines.length, 4) * 4.5) + 4;
       }
 
-      // Incluye / Detalle distintivo
+      // Detalle distintivo / Incluye (sin etiquetas HTML ni &nbsp;)
       if (options.includeDetail && prod.detalle_distintivo) {
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(70, 70, 70);
-        const detPlain = prod.detalle_distintivo.replace(/<[^>]*>/g, '').trim();
+        const detPlain = cleanHtmlText(prod.detalle_distintivo);
         const detLines = doc.splitTextToSize(`Incluye: ${detPlain}`, colWidth);
-        doc.text(detLines.slice(0, 2), colX, textY);
-        textY += (Math.min(detLines.length, 2) * 4.5) + 3;
+        doc.text(detLines.slice(0, 3), colX, textY);
+        textY += (Math.min(detLines.length, 3) * 4.5) + 4;
       }
 
-      // Precio y Disponibilidad en la parte inferior
+      // Precio y Disponibilidad
       if (options.includePrice && prod.precio_minorista) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(13);
@@ -232,13 +251,13 @@ async function buildAndOpenPdf() {
         doc.text(stockTxt, pageWidth - margin - 6, y + 104, { align: 'right' });
       }
 
-      // Numeración de página
+      // Numeración
       doc.setFontSize(8);
       doc.setTextColor(160, 160, 160);
       doc.text(`Página ${doc.internal.getNumberOfPages()}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
     }
 
-    // Crear Blob y mostrar directamente en el navegador
+    // Salida y apertura directa
     const pdfBlob = doc.output('blob');
     const blobUrl = URL.createObjectURL(pdfBlob);
     window.open(blobUrl, '_blank');

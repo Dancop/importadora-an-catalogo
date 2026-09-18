@@ -52,7 +52,7 @@ function openAdminPanel(target) {
   closeMobileMore();
   if (target === 'dashboard-panel') refreshDashboard();
   if (target === 'sales-panel') openSales();
-  if ((target === 'products-panel' || target === 'profitability-panel') && !productsLoaded) ensureProductsLoaded();
+  if ((target === 'products-panel' || target === 'profitability-panel' || target === 'catalog-settings-panel') && !productsLoaded) ensureProductsLoaded();
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
@@ -168,10 +168,8 @@ async function loadProducts() {
   document.querySelector('#share-template').value = shareTemplate;
   updateTemplatePreview();
   publicProducts = products || [];
-  if (!catalogPdfInitialized) {
-    initializeCatalogPdf({ products: publicProducts, config: catalogConfig });
-    catalogPdfInitialized = true;
-  }
+  initializeCatalogPdf({ products: publicProducts, config: catalogConfig });
+  catalogPdfInitialized = true;
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
   profitabilityRows = products.map(p => buildProfitabilityRow(p, privateMap.get(p.sku) || {}));
   renderProfitability();
@@ -679,6 +677,7 @@ document.querySelector('#catalog-settings-form').addEventListener('submit', asyn
     document.querySelector('#brand-logo-preview').src = logoUrl || '../assets/logo.png';
     document.querySelector('#company-logo').value = '';
     message.textContent = 'Configuración guardada. El catálogo ya fue actualizado.';
+    initializeCatalogPdf({ products: publicProducts, config: catalogConfig });
   } catch (error) { message.textContent = `No se guardó: ${error.message}`; }
 });
 
@@ -745,7 +744,7 @@ async function share(value, imageUrl, productName) {
     try {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
-      const extension = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+      const extension = blob.type === 'png' ? 'png' : blob.type === 'webp' ? 'webp' : 'jpg';
       const safeName = productName.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
       const file = new File([blob], `${safeName}.${extension}`, { type: blob.type || 'image/jpeg' });
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {

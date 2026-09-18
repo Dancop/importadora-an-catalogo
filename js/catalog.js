@@ -271,7 +271,7 @@ async function buildAndOpenPdf() {
         }
       }
 
-      // Numeración de página
+      // Numeración de cada página
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(160, 160, 160);

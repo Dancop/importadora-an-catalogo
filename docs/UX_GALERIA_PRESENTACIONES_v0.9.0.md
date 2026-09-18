@@ -1,5 +1,10 @@
 # UX de galería por presentación — v0.9.0
 
+
+## Compatibilidad con v0.9.4 — Catálogo PDF
+
+La versión 0.9.4 incorpora la generación del catálogo PDF desde **Configuración → Identidad y precios**. Esta funcionalidad es del panel administrativo, reutiliza los datos existentes de `productos_publicos` y **no requiere cambios de base de datos**. El PDF se genera localmente en el navegador.
+
 ## Objetivo
 Mostrar el producto como un modelo agrupado, pero permitir que cada presentación tenga sus propias fotografías y detalles sin obligar al cliente a abrir productos separados.
 

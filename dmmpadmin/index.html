@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/styles.css?v=20260913-2">
+  <link rel="stylesheet" href="../css/styles.css?v=20260918-1">
 </head>
 <body class="admin-body">
   <main class="admin-shell">
@@ -165,6 +165,20 @@
           </div>
           <label class="setting-toggle"><span><strong>Mostrar precios en el catálogo</strong><small>Si está desactivado, los visitantes verán “Consultar por WhatsApp”.</small></span><input id="show-prices" type="checkbox"><i aria-hidden="true"></i></label>
           <label class="setting-toggle"><span><strong>Mostrar “Mi costo” al abrir el panel</strong><small>Si está desactivado, el costo aparecerá oculto y podrás mostrarlo producto por producto.</small></span><input id="show-admin-cost" type="checkbox"><i aria-hidden="true"></i></label>
+          <div class="pdf-generator-card">
+            <div class="pdf-generator-heading"><div><p class="eyebrow">Catálogo PDF</p><h3>Generar catálogo para compartir</h3><p>Usa los productos, fotografías y datos actuales del catálogo público. El archivo se genera en este navegador y no se guarda en Supabase.</p></div><span class="pdf-generator-icon" aria-hidden="true">PDF</span></div>
+            <form id="catalog-pdf-form" class="pdf-generator-form">
+              <div class="pdf-generator-options">
+                <label class="setting-check"><input id="pdf-include-sku" type="checkbox" checked><span><strong>SKU</strong><small>Mostrar el código de cada producto.</small></span></label>
+                <label class="setting-check"><input id="pdf-include-description" type="checkbox" checked><span><strong>Descripción</strong><small>Incluir la descripción comercial.</small></span></label>
+                <label class="setting-check"><input id="pdf-include-detail" type="checkbox" checked><span><strong>Incluye / presentación</strong><small>Mostrar el contenido o detalle distintivo.</small></span></label>
+                <label class="setting-check"><input id="pdf-include-price" type="checkbox"><span><strong>Precio minorista</strong><small>Desactivado por defecto para compartir externamente.</small></span></label>
+                <label class="setting-check"><input id="pdf-include-stock" type="checkbox" checked><span><strong>Disponibilidad</strong><small>Mostrar “Disponible” o “Agotado”.</small></span></label>
+                <label class="setting-check"><input id="pdf-include-out-of-stock" type="checkbox"><span><strong>Incluir agotados</strong><small>Si se activa, también aparecen productos sin stock.</small></span></label>
+              </div>
+              <div class="pdf-generator-actions"><button id="generate-catalog-pdf" class="button primary" type="submit">Generar catálogo PDF</button><p id="catalog-pdf-message" class="form-message" aria-live="polite"></p></div>
+            </form>
+          </div>
           <p id="catalog-settings-message" class="form-message"></p>
           <button class="button primary" type="submit">Guardar configuración</button>
         </form>
@@ -237,6 +251,6 @@
         </div>
       </section></main></section>
   </main>
-  <script type="module" src="../js/admin-auth.js?v=20260913-2"></script>
+  <script type="module" src="../js/admin-auth.js?v=20260918-1"></script>
 </body>
 </html>

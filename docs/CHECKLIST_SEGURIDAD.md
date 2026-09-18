@@ -1,5 +1,10 @@
 # Checklist de seguridad — Importadora A&N
 
+
+## Compatibilidad con v0.9.4 — Catálogo PDF
+
+La versión 0.9.4 incorpora la generación del catálogo PDF desde **Configuración → Identidad y precios**. Esta funcionalidad es del panel administrativo, reutiliza los datos existentes de `productos_publicos` y **no requiere cambios de base de datos**. El PDF se genera localmente en el navegador.
+
 > **Proyecto:** Catálogo web y panel administrativo de Importadora A&N  
 > **Repositorio revisado:** `importadora-an-catalogo-main.zip`  
 > **Fecha de creación:** 27/07/2026 21:40 (America/La_Paz)  

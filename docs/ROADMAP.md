@@ -1,5 +1,10 @@
 # ROADMAP — Importadora A&N
 
+
+## Compatibilidad con v0.9.4 — Catálogo PDF
+
+La versión 0.9.4 incorpora la generación del catálogo PDF desde **Configuración → Identidad y precios**. Esta funcionalidad es del panel administrativo, reutiliza los datos existentes de `productos_publicos` y **no requiere cambios de base de datos**. El PDF se genera localmente en el navegador.
+
 ## Versión 0.7 — Panel administrativo
 
 - [x] Estructura general del panel.
@@ -81,3 +86,10 @@
 - [x] Mejorar la identidad visual del usuario y su rol en la cabecera.
 - [x] Cerrar la primera etapa funcional del módulo Ventas.
 - [ ] Siguiente módulo principal: Inventario (movimientos, entradas, ajustes e historial de stock).
+
+## v0.9.4 — Catálogo PDF
+
+- [x] Generador de catálogo PDF desde Configuración.
+- [x] Uso de datos y fotografías actuales de `productos_publicos`.
+- [x] Opciones de contenido y precios independientes de la visibilidad de precios del catálogo web.
+- [x] Generación local sin almacenamiento adicional en Supabase.

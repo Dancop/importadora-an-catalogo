@@ -13,6 +13,7 @@ import { db } from './supabase-client.js';
 import { WHATSAPP } from './config.js';
 import { initializeDashboard, refreshDashboard } from './modules/dashboard.js';
 import { initializeSales, openSales } from './modules/ventas.js';
+import { initializeCatalogPdf } from './catalog-pdf.js';
 const adminView = document.querySelector('#admin-view');
 let currentRole = null;
 let currentProfile = null;
@@ -29,6 +30,7 @@ let profitabilityRows = [];
 let productsLoaded = false;
 let productsLoading = null;
 let publicProducts = [];
+let catalogPdfInitialized = false;
 
 document.querySelector('#logout').addEventListener('click', async () => { await db.auth.signOut(); location.reload(); });
 
@@ -166,6 +168,10 @@ async function loadProducts() {
   document.querySelector('#share-template').value = shareTemplate;
   updateTemplatePreview();
   publicProducts = products || [];
+  if (!catalogPdfInitialized) {
+    initializeCatalogPdf({ products: publicProducts, config: catalogConfig });
+    catalogPdfInitialized = true;
+  }
   const privateMap = new Map(inventory.map(i => [i.sku, i]));
   profitabilityRows = products.map(p => buildProfitabilityRow(p, privateMap.get(p.sku) || {}));
   renderProfitability();

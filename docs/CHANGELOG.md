@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## 0.9.4 — 2026-09-18
+### Added
+- Generador de catálogo PDF en **Configuración → Identidad y precios** del panel administrativo.
+- Opciones para incluir SKU, descripción, incluye/presentación, precio minorista, disponibilidad y productos agotados.
+- Generación A4 con portada, fotografías y fichas de productos.
+- El PDF se genera en el navegador y no se guarda en Supabase.
+
+### Changed
+- El generador reutiliza `productos_publicos` y la configuración actual del catálogo.
+- El precio del PDF queda desactivado por defecto, independientemente de `mostrar_precios`.
+
+### Database
+- No requiere SQL nuevo ni nuevas tablas/columnas.
+
+
+## 0.9.3 — 2026-09-17
+### Changed
+- Al abrir un producto con presentaciones, la primera presentación queda seleccionada automáticamente.
+- El botón de WhatsApp y la función Compartir quedan disponibles desde la apertura usando la primera presentación.
+- El contenido de `{detalle}` en WhatsApp proviene únicamente de `detalle_distintivo`.
+- Se eliminaron del procesamiento automático de WhatsApp los campos `Exterior` e `Interior`.
+- El código no agrega títulos como `Incluye y presentación:` o `Contenido:`; el formato continúa dependiendo de la plantilla editable de WhatsApp.
+- El texto enriquecido conserva saltos de línea y listas al convertirse para compartir; negrita, cursiva y tachado se traducen a formato compatible con WhatsApp.
+- Se agregó separación superior entre el encabezado **Descripción** y su contenido.
+- Se conserva sin cambios la navegación continua de la galería y la eliminación de la etiqueta **Disponible** introducidas en v0.9.2.
+
+### Database
+- No se requiere SQL nuevo.
+
 ## 0.9.2 — 2026-09-16
 ### Changed
 - La navegación de la galería ahora conecta la portada con las presentaciones en una secuencia continua.

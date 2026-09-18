@@ -1,5 +1,10 @@
 # ARQUITECTURA — Importadora A&N
 
+
+## Compatibilidad con v0.9.4 — Catálogo PDF
+
+La versión 0.9.4 incorpora la generación del catálogo PDF desde **Configuración → Identidad y precios**. Esta funcionalidad es del panel administrativo, reutiliza los datos existentes de `productos_publicos` y **no requiere cambios de base de datos**. El PDF se genera localmente en el navegador.
+
 ## Flujo comercial
 
 ```text
@@ -126,3 +131,9 @@ La edición se realiza exclusivamente mediante la RPC `editar_venta()`. La funci
 El catálogo mantiene el modelo agrupado por `codigo_modelo`. Al abrir un producto se presenta primero `imagen_portada` sin seleccionar ninguna variante. Las presentaciones se activan explícitamente por el usuario y, desde ese momento, la galería utiliza exclusivamente el arreglo `imagenes` de la presentación seleccionada.
 
 La selección genera un enlace profundo usando el código del modelo y el SKU de la presentación cuando existe (`?producto=...&sku=...`). Si una presentación no tiene SKU, se utiliza su índice como respaldo (`?producto=...&presentacion=...`). Esto permite compartir o abrir directamente una presentación concreta sin duplicar productos en el catálogo.
+
+## v0.9.4 — Generación de catálogo PDF
+
+El panel administrativo incorpora `js/catalog-pdf.js`. El módulo recibe los registros ya cargados de `productos_publicos` y la configuración de `configuracion_publica`, carga las fotografías públicas y genera un PDF A4 directamente en el navegador mediante jsPDF.
+
+No se crea una copia de los productos ni se almacena el PDF en Supabase. Las opciones de salida controlan SKU, descripción, detalle/presentación, precio minorista, disponibilidad y productos agotados.

@@ -1,5 +1,10 @@
 # Cambios del editor enriquecido — v0.9.0
 
+
+## Compatibilidad con v0.9.4 — Catálogo PDF
+
+La versión 0.9.4 incorpora la generación del catálogo PDF desde **Configuración → Identidad y precios**. Esta funcionalidad es del panel administrativo, reutiliza los datos existentes de `productos_publicos` y **no requiere cambios de base de datos**. El PDF se genera localmente en el navegador.
+
 ## Objetivo
 
 Permitir que las descripciones de productos tengan formato básico sin obligar al usuario a escribir HTML manualmente.

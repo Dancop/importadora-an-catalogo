@@ -3,7 +3,18 @@
 Sistema web para catálogo, productos, inventario, ventas, finanzas, usuarios y configuración.
 
 ## Versión actual
-**0.9.2 — Navegación continua de galería y catálogo más limpio**
+**0.9.4 — Generación de catálogo PDF desde el panel administrativo**
+
+### Novedades de v0.9.4
+- Añade la sección **Catálogo PDF** dentro de **Configuración → Identidad y precios**.
+- Permite generar un catálogo A4 directamente desde el navegador usando los productos y fotografías actuales de `productos_publicos`.
+- El administrador puede decidir si incluir SKU, descripción, contenido/presentación, precio minorista, disponibilidad y productos agotados.
+- El precio está desactivado por defecto en el PDF para facilitar el uso como catálogo comercial externo.
+- El PDF no se almacena en Supabase; se genera y descarga localmente.
+- No requiere cambios en la base de datos.
+- Se incorporó `js/catalog-pdf.js` y se actualizó la documentación de arquitectura, UX, seguridad y roadmap.
+
+### Historial anterior
 
 ### Novedades de v0.9.2
 - La galería se recorre de forma continua: portada → fotografías de la primera presentación → fotografías de la siguiente presentación.

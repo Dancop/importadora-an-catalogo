@@ -414,16 +414,51 @@ document.querySelectorAll('.filter').forEach(button => button.addEventListener('
 async function load() {
   status.hidden = false; status.textContent = 'Cargando productos…';
   try {
-    const [{ data, error }, { data: config }] = await Promise.all([
+    const [productsResult, configResult, popularityResult] = await Promise.all([
       db.from('productos_publicos').select('*').order('orden'),
-      db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id','catalogo').single()
+      db.from('configuracion_publica').select('plantilla_whatsapp,mostrar_precios,nombre_empresa,logo_url').eq('id','catalogo').single(),
+      db.rpc('obtener_orden_catalogo_por_ventas', { p_dias: 60 })
     ]);
+
+    const { data, error } = productsResult;
+    const { data: config } = configResult;
+    const { data: popularity, error: popularityError } = popularityResult;
+
     if (error) throw error;
+    if (popularityError) {
+      console.warn('No se pudo cargar el orden por ventas; se conservará el orden manual del catálogo.', popularityError);
+    }
+
     shareTemplate = config?.plantilla_whatsapp?.trim() || DEFAULT_TEMPLATE;
     showPrices = config?.mostrar_precios === true;
     companyName = config?.nombre_empresa?.trim() || 'Importadora A&N';
     brandLogo = config?.logo_url || './assets/logo.png';
-    applyBrand(); groups = groupProducts(data || []); render(); status.hidden = true;
+    applyBrand();
+
+    groups = groupProducts(data || []);
+
+    // La RPC pública devuelve únicamente el orden de los modelos, nunca las
+    // unidades vendidas ni otros datos comerciales. Si falla, se mantiene el
+    // orden actual basado en la columna `orden`.
+    if (!popularityError && Array.isArray(popularity) && popularity.length) {
+      const positionMap = new Map(
+        popularity
+          .filter(item => item?.codigo_modelo)
+          .map(item => [String(item.codigo_modelo).trim(), Number(item.posicion)])
+      );
+
+      groups.sort((a, b) => {
+        const positionA = positionMap.get(String(a.codigo_modelo).trim());
+        const positionB = positionMap.get(String(b.codigo_modelo).trim());
+
+        if (positionA != null && positionB != null && positionA !== positionB) return positionA - positionB;
+        if (positionA != null) return -1;
+        if (positionB != null) return 1;
+        return (Number(a.orden) || 0) - (Number(b.orden) || 0);
+      });
+    }
+
+    render(); status.hidden = true;
     const params = new URLSearchParams(location.search);
     const deepLinkCode = params.get('producto');
     const deepLinkSku = params.get('sku');

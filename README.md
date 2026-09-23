@@ -3,7 +3,15 @@
 Sistema web para catálogo, productos, inventario, ventas, finanzas, usuarios y configuración.
 
 ## Versión actual
-**0.9.4 — Generación de catálogo PDF desde el panel administrativo**
+**0.9.5 — Orden del catálogo por ventas recientes**
+
+### Novedades de v0.9.5
+- Ordena automáticamente los modelos públicos del catálogo según las ventas completadas de los últimos 60 días.
+- Agrupa las ventas por `codigo_modelo`, por lo que las distintas presentaciones/SKU de un mismo modelo contribuyen al mismo posicionamiento.
+- Mantiene `productos_publicos.orden` como criterio de desempate y como respaldo cuando la RPC de popularidad no está disponible.
+- La RPC pública `obtener_orden_catalogo_por_ventas()` devuelve únicamente el modelo y su posición; no expone unidades vendidas, importes, clientes ni fechas comerciales.
+- Añade índices para acelerar el cálculo del ranking.
+- Requiere ejecutar `docs/05_orden_catalogo_por_ventas_v0.9.5.sql` en Supabase.
 
 ### Novedades de v0.9.4
 - Añade la sección **Catálogo PDF** dentro de **Configuración → Identidad y precios**.

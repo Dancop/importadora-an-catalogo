@@ -49,6 +49,9 @@ function groupProducts(rows) {
     if (!map.has(key)) map.set(key, { ...row, codigo_modelo: key, variants: [], imagen_portada: row.imagen_portada || null });
     const group = map.get(key);
     if (!group.imagen_portada && row.imagen_portada) group.imagen_portada = row.imagen_portada;
+    // Si alguna presentación define un nombre de modelo explícito, ese nombre
+    // gana sobre el de la presentación más antigua (comportamiento anterior).
+    if (!group.nombre_modelo && row.nombre_modelo) { group.nombre_modelo = row.nombre_modelo; group.nombre = row.nombre_modelo; }
     group.variants.push(row);
   });
   return [...map.values()];

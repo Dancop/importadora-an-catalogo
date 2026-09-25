@@ -405,6 +405,7 @@ function editor(p, i) {
             <section class="admin-form-section identity-section" aria-labelledby="identity-${attr(p.sku)}">
               <div class="admin-section-heading"><div><div><h3 id="identity-${attr(p.sku)}">Información del producto</h3><p>Abre esta sección solo cuando necesites cambiar los datos visibles.</p></div></div></div>
               <label>Nombre del producto<input name="nombre" value="${attr(p.nombre)}" required></label>
+              <label>Nombre del modelo (aparece en la portada del catálogo)<input name="nombre_modelo" value="${attr(p.nombre_modelo || '')}" placeholder="${attr(p.nombre || '')}"><small>Se comparte entre todas las presentaciones con el mismo código de modelo. Si lo dejas vacío, se usa el nombre de la presentación más antigua (comportamiento anterior).</small></label>
               <div class="field-grid">
                 <label>SKU<input name="sku" class="sku-input locked-input" value="${attr(p.sku)}" readonly aria-readonly="true"><small>Identificador protegido; no se modifica.</small></label>
                 <label>Código de modelo<input name="codigo_modelo" value="${attr(p.codigo_modelo || '')}" required></label>
@@ -606,7 +607,8 @@ async function save(event, sku) {
   }
   catch (e) { message.textContent = e.message; return; }
   const retailPrice = nullableNumber(form.precio_minorista.value);
-  const publicData = { nombre: form.nombre.value.trim(), codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: sanitizeRichHtml(form.descripcion.value), detalle_distintivo: sanitizeRichHtml(form.detalle_distintivo.value), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
+  const modelName = form.nombre_modelo.value.trim() || null;
+  const publicData = { nombre: form.nombre.value.trim(), nombre_modelo: modelName, codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: sanitizeRichHtml(form.descripcion.value), detalle_distintivo: sanitizeRichHtml(form.detalle_distintivo.value), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
   const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), actualizado_en:new Date().toISOString() };
   const modelCode = form.codigo_modelo.value.trim();
   const updates = [
@@ -614,6 +616,7 @@ async function save(event, sku) {
     db.from('inventario_privado').update(privateData).eq('sku', sku)
   ];
   if (modelCode && coverUrl) updates.push(db.from('productos_publicos').update({ imagen_portada: coverUrl, actualizado_en:new Date().toISOString() }).eq('codigo_modelo', modelCode));
+  if (modelCode && modelName) updates.push(db.from('productos_publicos').update({ nombre_modelo: modelName, actualizado_en:new Date().toISOString() }).eq('codigo_modelo', modelCode));
   const results = await Promise.all(updates);
   const failed = results.find(result => result.error)?.error;
   if (failed) message.textContent = `No se guardó: ${failed.message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }

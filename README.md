@@ -3,7 +3,14 @@
 Sistema web para catálogo, productos, inventario, ventas, finanzas, usuarios y configuración.
 
 ## Versión actual
-**0.9.5 — Orden del catálogo por ventas recientes**
+**0.9.6 — Nombre de modelo editable para la portada del catálogo**
+
+### Novedades de v0.9.6
+- Nuevo campo "Nombre del modelo (aparece en la portada del catálogo)" en el panel administrativo, dentro de **2. Datos del producto**.
+- Antes, el nombre mostrado en la portada de cada modelo se tomaba implícitamente del campo "Nombre del producto" de la presentación con el `orden` más bajo, sin ninguna indicación en la interfaz. Ahora es un campo explícito, independiente del nombre de cada presentación.
+- El valor se comparte automáticamente entre todas las presentaciones del mismo código de modelo (igual que la imagen de portada).
+- Si el campo se deja vacío, el catálogo sigue funcionando como antes (usa el nombre de la presentación más antigua).
+- Requiere ejecutar `docs/06_nombre_modelo_v0.9.6.sql` en Supabase (incluye backfill automático para modelos existentes).
 
 ### Novedades de v0.9.5
 - Ordena automáticamente los modelos públicos del catálogo según las ventas completadas de los últimos 60 días.

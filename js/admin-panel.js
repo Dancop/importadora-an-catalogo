@@ -632,7 +632,7 @@ async function uploadModelCover(modelCode, file) {
 }
 
 async function uploadPhotos(sku, files, existing) {
-  if (existing + files.length > 6) throw new Error('Máximo 6 fotografías por producto.');
+  
   const urls = [];
   for (let index = 0; index < files.length; index++) {
     const blob = await compress(files[index]);

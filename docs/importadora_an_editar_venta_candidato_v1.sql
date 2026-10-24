@@ -162,3 +162,8 @@ BEGIN
  RETURN p_venta_id;
 END
 $fn$;
+
+-- Revisión de permisos: producción actual permite EXECUTE a anon,
+-- authenticated, postgres y service_role; el control efectivo de la RPC
+-- exige auth.uid() y public.puede_editar(). Antes del despliegue, evaluar
+-- revocar anon mediante migración de permisos separada y aprobada.

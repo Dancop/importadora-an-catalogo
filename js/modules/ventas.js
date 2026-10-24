@@ -3,7 +3,7 @@
 Importadora A&N
 Módulo: Ventas
 Autor: Codex + Daniel
-Versión: 0.8.2
+Versión: 0.8.3-candidata
 Última modificación: 2026-07-29
 Descripción: Registro rápido de ventas con precio real editable,
 resumen de proveedor y ganancia, descuento automático de stock
@@ -16,6 +16,8 @@ let loaded = false;
 let loadingPromise = null;
 let products = [];
 let cart = [];
+let cartSequence = 0;
+let originalSaleDetails = [];
 let saving = false;
 let editingSaleId = null;
 let selectedSale = null;
@@ -101,7 +103,7 @@ function ensureLoaded() {
         costo_proveedor: (Number(item.precio_base) || 0) * (Number(item.factor_costo) || 0),
         imagen: Array.isArray(product.imagenes) ? product.imagenes[0] : null
       };
-    }).filter(product => product.stock > 0);
+    });
     loaded = true;
     status.textContent = products.length ? `${products.length} productos disponibles.` : 'No hay productos con stock disponible.';
     renderProducts();
@@ -116,7 +118,7 @@ function ensureLoaded() {
 function renderProducts() {
   const container = $('#sales-product-list');
   const term = ($('#sales-product-search')?.value || '').trim().toLowerCase();
-  const visible = products.filter(product => [product.nombre, product.sku, product.codigo_modelo, product.color_caja].some(value => String(value || '').toLowerCase().includes(term)));
+  const visible = products.filter(product => product.stock > 0 && [product.nombre, product.sku, product.codigo_modelo, product.color_caja].some(value => String(value || '').toLowerCase().includes(term)));
   container.innerHTML = visible.map(product => `
     <article class="sales-product-card">
       ${product.imagen ? `<img src="${escapeHtml(product.imagen)}" alt="${escapeHtml(product.nombre)}" loading="lazy">` : '<div class="sales-product-placeholder">Sin foto</div>'}
@@ -133,44 +135,52 @@ function addProduct(sku, type) {
   const product = products.find(item => item.sku === sku);
   if (!product) return;
   const suggested = type === 'mayorista' ? product.precio_mayorista : product.precio_minorista;
-  const existing = cart.find(item => item.sku === sku);
+  const existing = cart.find(item => item.sku === sku && !item.id_detalle);
   if (existing) {
     existing.tipo_precio = type;
     existing.precio_sugerido = suggested;
     existing.precio_venta = suggested;
   } else {
-    cart.push({ ...product, cantidad: 1, tipo_precio: type, precio_sugerido: suggested, precio_venta: suggested });
+    cart.push({ ...product, cart_key: `new-${++cartSequence}`, cantidad: 1, tipo_precio: type, precio_sugerido: suggested, precio_venta: suggested });
   }
   renderCart();
   document.querySelector('.sales-cart-pane')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function availableForLine(item) {
+  const original = editingSaleId ? originalSaleDetails : [];
+  const restored = original.filter(row => row.sku === item.sku).reduce((sum, row) => sum + Number(row.cantidad || 0), 0);
+  const current = products.find(row => row.sku === item.sku);
+  const occupied = cart.filter(row => row !== item && row.sku === item.sku).reduce((sum, row) => sum + Number(row.cantidad || 0), 0);
+  return Math.max(0, Number(current?.stock || 0) + restored - occupied);
 }
 
 function renderCart() {
   const list = $('#sales-cart-list');
   $('#sales-cart-empty').hidden = cart.length > 0;
   list.innerHTML = cart.map(item => `
-    <article class="sales-cart-item" data-cart-sku="${escapeHtml(item.sku)}">
+    <article class="sales-cart-item" data-cart-key="${escapeHtml(item.cart_key || item.id_detalle)}">
       <div class="sales-cart-product">${item.imagen ? `<img src="${escapeHtml(item.imagen)}" alt="">` : ''}<div><strong>${escapeHtml(item.nombre)}</strong><small>${item.tipo_precio === 'mayorista' ? 'Mayorista' : 'Minorista'} sugerido: ${money(item.precio_sugerido)}</small></div><button type="button" data-remove-cart aria-label="Quitar producto">×</button></div>
       <div class="sales-cart-controls">
-        <label>Cantidad<div class="quantity-control"><button type="button" data-qty="-1">−</button><input type="number" min="1" max="${item.stock}" value="${item.cantidad}" inputmode="numeric" data-cart-quantity><button type="button" data-qty="1">＋</button></div></label>
+        <label>Cantidad<div class="quantity-control"><button type="button" data-qty="-1">−</button><input type="number" min="1" max="${availableForLine(item)}" value="${item.cantidad}" inputmode="numeric" data-cart-quantity><button type="button" data-qty="1">＋</button></div></label>
         <label>Precio vendido <div class="price-input"><span>Bs</span><input type="number" min="0" step="0.01" value="${item.precio_venta}" inputmode="decimal" data-cart-price></div></label>
       </div>
       <div class="sales-cart-item-totals"><span>Subtotal <strong>${money(item.cantidad * item.precio_venta)}</strong></span><span>Proveedor <strong>${money(item.cantidad * item.costo_proveedor)}</strong></span><span>Ganancia <strong>${money(item.cantidad * (item.precio_venta - item.costo_proveedor))}</strong></span></div>
     </article>`).join('');
 
-  list.querySelectorAll('[data-cart-sku]').forEach(card => bindCartItem(card));
+  list.querySelectorAll('[data-cart-key]').forEach(card => bindCartItem(card));
   renderTotals();
 }
 
 function bindCartItem(card) {
-  const item = cart.find(row => row.sku === card.dataset.cartSku);
-  card.querySelector('[data-remove-cart]').addEventListener('click', () => { cart = cart.filter(row => row.sku !== item.sku); renderCart(); });
+  const item = cart.find(row => String(row.cart_key || row.id_detalle) === card.dataset.cartKey);
+  card.querySelector('[data-remove-cart]').addEventListener('click', () => { cart = cart.filter(row => row !== item); renderCart(); });
   card.querySelectorAll('[data-qty]').forEach(button => button.addEventListener('click', () => {
-    item.cantidad = Math.max(1, Math.min(item.stock, item.cantidad + Number(button.dataset.qty)));
+    item.cantidad = Math.max(1, Math.min(Math.max(1, availableForLine(item)), item.cantidad + Number(button.dataset.qty)));
     renderCart();
   }));
   card.querySelector('[data-cart-quantity]').addEventListener('change', event => {
-    item.cantidad = Math.max(1, Math.min(item.stock, Number(event.target.value) || 1));
+    item.cantidad = Math.max(1, Math.min(availableForLine(item), Number(event.target.value) || 1));
     renderCart();
   });
   card.querySelector('[data-cart-price]').addEventListener('change', event => {
@@ -201,10 +211,13 @@ async function registerSale() {
   const button = $('#sales-register');
   const message = $('#sales-save-message');
   button.disabled = true;
-  button.textContent = 'Registrando…';
+  button.textContent = editingSaleId ? 'Guardando cambios…' : 'Registrando…';
   message.textContent = '';
   try {
+    const wasEdited = Boolean(editingSaleId);
+    if (cart.some(item => item.cantidad < 1 || item.cantidad > availableForLine(item))) throw new Error('Cantidad superior al stock disponible');
     const payload = cart.map(item => ({
+      ...(editingSaleId && item.id_detalle ? { id_detalle: item.id_detalle } : {}),
       sku: item.sku,
       cantidad: item.cantidad,
       tipo_precio: item.tipo_precio,
@@ -228,14 +241,14 @@ async function registerSale() {
     loaded = false;
     products = [];
     resetSale();
-    showSuccess(completedSale, Boolean(editingSaleId));
+    showSuccess(completedSale, wasEdited);
     if (context.onSaleRegistered) context.onSaleRegistered();
   } catch (error) {
     console.error('No se pudo registrar la venta:', error);
     message.textContent = friendlyError(error);
   } finally {
     saving = false;
-    button.textContent = 'Registrar venta';
+    button.textContent = editingSaleId ? 'Guardar cambios' : 'Registrar venta';
     renderTotals();
   }
 }
@@ -255,6 +268,7 @@ function closeSuccess() {
 
 function resetSale() {
   editingSaleId = null;
+  originalSaleDetails = [];
   cart = [];
   $('#sales-edit-banner')?.setAttribute('hidden', '');
   if ($('#sales-register')) $('#sales-register').textContent = 'Registrar venta';
@@ -307,9 +321,10 @@ async function beginEditSelectedSale() {
   closeSaleDetail();
   await ensureLoaded();
   editingSaleId = sale.id;
+  originalSaleDetails = sale.details;
   cart = sale.details.map(detail => {
     const current = products.find(product => product.sku === detail.sku) || {};
-    return { ...current, sku: detail.sku, nombre: detail.producto_nombre, imagen: detail.imagen_principal, stock: (Number(current.stock) || 0) + Number(detail.cantidad), cantidad: Number(detail.cantidad), tipo_precio: detail.tipo_precio, precio_sugerido: Number(detail.precio_sugerido_unitario), precio_venta: Number(detail.precio_venta_unitario), costo_proveedor: Number(detail.costo_proveedor_unitario) };
+    return { ...current, id_detalle: detail.id, cart_key: detail.id, sku: detail.sku, nombre: detail.producto_nombre, imagen: detail.imagen_principal, stock: Number(current.stock) || 0, cantidad: Number(detail.cantidad), tipo_precio: detail.tipo_precio, precio_sugerido: Number(detail.precio_sugerido_unitario), precio_venta: Number(detail.precio_venta_unitario), costo_proveedor: Number(detail.costo_proveedor_unitario) };
   });
   $('#sale-date').value = String(sale.fecha).slice(0, 10);
   $('#sale-client-name').value = sale.cliente_nombre || '';

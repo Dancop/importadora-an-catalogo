@@ -17,6 +17,12 @@ DECLARE
  v_items jsonb := '[]'::jsonb;
  v_stock_original jsonb := '{}'::jsonb;
 BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_catalog.pg_trigger t
+   WHERE t.tgrelid='public.detalle_ventas'::regclass
+     AND t.tgname='trg_completar_finanzas_detalle_v3'
+     AND NOT t.tgisinternal AND t.tgenabled<>'D'
+ ) THEN RAISE EXCEPTION 'Falta el trigger financiero V3 requerido'; END IF;
  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Sesión no válida.'; END IF;
  IF NOT public.puede_editar() THEN RAISE EXCEPTION 'No tienes permiso para editar ventas.'; END IF;
  IF p_productos IS NULL OR jsonb_typeof(p_productos)<>'array'
@@ -113,6 +119,13 @@ BEGIN
        round(v_inv.precio_base*v_inv.factor_costo,2),round(v_gastos,2));
    END IF;
  END LOOP;
+
+ IF EXISTS (SELECT 1 FROM public.detalle_ventas d WHERE d.venta_id=p_venta_id
+   AND (d.subtotal IS NULL OR d.costo_proveedor_total IS NULL
+     OR d.ganancia_real IS NULL OR d.factor_adquisicion_historico IS NULL
+     OR d.costo_adquisicion_total IS NULL)) THEN
+   RAISE EXCEPTION 'Detalle financiero incompleto después de edición';
+ END IF;
 
  -- Aplicar variación neta por SKU usando cantidades anteriores guardadas.
  FOR v_sku_lock IN SELECT key FROM jsonb_each(v_stock_original) ORDER BY key LOOP

@@ -42,7 +42,8 @@ BEGIN
    v_tipo:=coalesce(nullif(btrim(v_item->>'tipo_precio'),''),'personalizado');
    v_id:=nullif(v_item->>'id_detalle','')::uuid;
    IF v_sku IS NULL OR v_qty IS NULL OR v_qty<=0
-      OR v_precio IS NULL OR v_precio<0 OR v_gastos<0 THEN
+      OR v_precio IS NULL OR v_precio<0 OR v_gastos<0
+      OR v_tipo NOT IN ('minorista','mayorista','personalizado') THEN
       RAISE EXCEPTION 'Hay un producto con datos no válidos.';
    END IF;
    IF v_id IS NOT NULL THEN
@@ -75,7 +76,7 @@ BEGIN
    v_stock_original:=jsonb_set(v_stock_original,ARRAY[v_sku_lock],to_jsonb(v_old));
    SELECT coalesce(sum((value->>'cantidad')::int),0)::int INTO v_new
      FROM jsonb_array_elements(v_items) WHERE value->>'sku'=v_sku_lock;
-   IF v_inv.stock+v_old-v_new<0 THEN
+   IF v_inv.stock IS NULL OR v_inv.stock+v_old-v_new<0 THEN
      RAISE EXCEPTION 'Stock insuficiente para %. Disponible: %, solicitado: %.',
        v_sku_lock,v_inv.stock+v_old,v_new;
    END IF;

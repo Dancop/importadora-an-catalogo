@@ -1,4 +1,4 @@
--- CANDIDATO PARA REVISION / NO EJECUTAR EN PRODUCCION
+-- CANDIDATO V2 COMPLETO PARA PRUEBAS / NO EJECUTAR EN PRODUCCION
 -- Instalar conjuntamente con importadora_an_finanzas_trigger_candidato_v3.sql.
 -- Conserva la firma existente; cada linea historica envia id_detalle.
 CREATE OR REPLACE FUNCTION public.editar_venta(
@@ -15,6 +15,7 @@ DECLARE
  v_sugerido numeric; v_sku_lock text;
  v_ids uuid[] := ARRAY[]::uuid[];
  v_items jsonb := '[]'::jsonb;
+ v_stock_original jsonb := '{}'::jsonb;
 BEGIN
  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Sesión no válida.'; END IF;
  IF NOT public.puede_editar() THEN RAISE EXCEPTION 'No tienes permiso para editar ventas.'; END IF;
@@ -65,6 +66,7 @@ BEGIN
    IF NOT FOUND THEN RAISE EXCEPTION 'No existe inventario para %',v_sku_lock; END IF;
    SELECT coalesce(sum(cantidad),0)::int INTO v_old
      FROM public.detalle_ventas WHERE venta_id=p_venta_id AND sku=v_sku_lock;
+   v_stock_original:=jsonb_set(v_stock_original,ARRAY[v_sku_lock],to_jsonb(v_old));
    SELECT coalesce(sum((value->>'cantidad')::int),0)::int INTO v_new
      FROM jsonb_array_elements(v_items) WHERE value->>'sku'=v_sku_lock;
    IF v_inv.stock+v_old-v_new<0 THEN
@@ -112,9 +114,37 @@ BEGIN
    END IF;
  END LOOP;
 
- -- IMPORTANTE: usar las cantidades originales capturadas ANTES de editar.
- -- Este candidato no aplica aún el delta neto: no ejecutar hasta incorporar
- -- una instantánea transaccional de cantidades originales y auditar movimientos.
- RAISE EXCEPTION 'CANDIDATO INCOMPLETO: falta delta neto de inventario';
+ -- Aplicar variación neta por SKU usando cantidades anteriores guardadas.
+ FOR v_sku_lock IN SELECT key FROM jsonb_each(v_stock_original) ORDER BY key LOOP
+   v_old:=(v_stock_original->>v_sku_lock)::int;
+   SELECT coalesce(sum((value->>'cantidad')::int),0)::int INTO v_new
+     FROM jsonb_array_elements(v_items) WHERE value->>'sku'=v_sku_lock;
+   v_delta:=v_old-v_new;
+   IF v_delta<>0 THEN
+     SELECT stock INTO v_stock FROM public.inventario_privado WHERE sku=v_sku_lock;
+     UPDATE public.inventario_privado
+       SET stock=v_stock+v_delta,actualizado_en=now() WHERE sku=v_sku_lock;
+     INSERT INTO public.movimientos_inventario(
+       sku,venta_id,tipo,cantidad,stock_anterior,stock_nuevo,observacion,creado_por)
+     VALUES(v_sku_lock,p_venta_id,
+       CASE WHEN v_delta>0 THEN 'anulacion_venta' ELSE 'venta' END,
+       v_delta,v_stock,v_stock+v_delta,'Ajuste neto por edición de venta',auth.uid());
+   END IF;
+ END LOOP;
+
+ -- Recalcular con los detalles ya persistidos y el trigger financiero V3.
+ UPDATE public.ventas v SET
+   fecha=coalesce(p_fecha,v.fecha),
+   cliente_nombre=nullif(btrim(p_cliente_nombre),''),
+   cliente_telefono=nullif(btrim(p_cliente_telefono),''),
+   metodo_pago=nullif(btrim(p_metodo_pago),''),
+   observacion=nullif(btrim(p_observacion),''),
+   total_venta=(SELECT coalesce(sum(d.subtotal),0) FROM public.detalle_ventas d WHERE d.venta_id=p_venta_id),
+   total_costo_proveedor=(SELECT coalesce(sum(d.costo_proveedor_total),0) FROM public.detalle_ventas d WHERE d.venta_id=p_venta_id),
+   total_otros_gastos=(SELECT coalesce(sum(d.otros_gastos),0) FROM public.detalle_ventas d WHERE d.venta_id=p_venta_id),
+   total_ganancia=(SELECT coalesce(sum(d.ganancia_real),0) FROM public.detalle_ventas d WHERE d.venta_id=p_venta_id),
+   modificada_por=auth.uid(),modificada_en=now()
+ WHERE v.id=p_venta_id;
+ RETURN p_venta_id;
 END
 $fn$;

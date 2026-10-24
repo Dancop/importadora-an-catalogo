@@ -86,7 +86,7 @@ function ensureLoaded() {
   status.textContent = 'Cargando productos…';
   loadingPromise = Promise.all([
     withTimeout(context.db.from('productos_publicos').select('sku,nombre,codigo_modelo,color_caja,imagenes').order('orden'), 15000),
-    withTimeout(context.db.from('inventario_privado').select('sku,stock,precio_base,factor_costo,precio_minorista,precio_mayorista'), 15000)
+    withTimeout(context.db.from('inventario_privado').select('sku,stock,precio_base,factor_costo,factor_adquisicion,precio_minorista,precio_mayorista'), 15000)
   ]).then(([publicResult, privateResult]) => {
     if (publicResult.error) throw publicResult.error;
     if (privateResult.error) throw privateResult.error;
@@ -98,9 +98,11 @@ function ensureLoaded() {
         stock: Number(item.stock) || 0,
         precio_base: Number(item.precio_base) || 0,
         factor_costo: Number(item.factor_costo) || 0,
+        factor_adquisicion: Number(item.factor_adquisicion ?? 2.2),
         precio_minorista: Number(item.precio_minorista) || 0,
         precio_mayorista: Number(item.precio_mayorista) || 0,
         costo_proveedor: (Number(item.precio_base) || 0) * (Number(item.factor_costo) || 0),
+        costo_adquisicion: (Number(item.precio_base) || 0) * Number(item.factor_adquisicion ?? 2.2),
         imagen: Array.isArray(product.imagenes) ? product.imagenes[0] : null
       };
     });
@@ -165,7 +167,7 @@ function renderCart() {
         <label>Cantidad<div class="quantity-control"><button type="button" data-qty="-1">−</button><input type="number" min="1" max="${availableForLine(item)}" value="${item.cantidad}" inputmode="numeric" data-cart-quantity><button type="button" data-qty="1">＋</button></div></label>
         <label>Precio vendido <div class="price-input"><span>Bs</span><input type="number" min="0" step="0.01" value="${item.precio_venta}" inputmode="decimal" data-cart-price></div></label>
       </div>
-      <div class="sales-cart-item-totals"><span>Subtotal <strong>${money(item.cantidad * item.precio_venta)}</strong></span><span>Proveedor <strong>${money(item.cantidad * item.costo_proveedor)}</strong></span><span>Ganancia <strong>${money(item.cantidad * (item.precio_venta - item.costo_proveedor))}</strong></span></div>
+      <div class="sales-cart-item-totals"><span>Subtotal <strong>${money(item.cantidad * item.precio_venta)}</strong></span><span>Proveedor recibe <strong>${money(item.cantidad * item.costo_proveedor)}</strong></span><span>Proveedor gana <strong>${money(item.cantidad * (item.costo_proveedor - item.costo_adquisicion))}</strong></span><span>Nuestra ganancia bruta <strong>${money(item.cantidad * (item.precio_venta - item.costo_proveedor))}</strong></span></div>
     </article>`).join('');
 
   list.querySelectorAll('[data-cart-key]').forEach(card => bindCartItem(card));
@@ -193,8 +195,9 @@ function totals() {
   return cart.reduce((sum, item) => {
     sum.total += item.cantidad * item.precio_venta;
     sum.proveedor += item.cantidad * item.costo_proveedor;
+    sum.proveedorGanancia += item.cantidad * (item.costo_proveedor - item.costo_adquisicion);
     return sum;
-  }, { total: 0, proveedor: 0 });
+  }, { total: 0, proveedor: 0, proveedorGanancia: 0 });
 }
 
 function renderTotals() {
@@ -202,6 +205,8 @@ function renderTotals() {
   $('#sale-total').textContent = money(result.total);
   $('#sale-provider-total').textContent = money(result.proveedor);
   $('#sale-profit-total').textContent = money(result.total - result.proveedor);
+  const providerProfitNode = $('#sale-provider-profit-total');
+  if (providerProfitNode) providerProfitNode.textContent = money(result.proveedorGanancia);
   $('#sales-register').disabled = !cart.length || saving || context.role === 'solo_lectura';
 }
 
@@ -256,7 +261,7 @@ async function registerSale() {
 function showSuccess(sale, wasEdited = false) {
   $('#sales-success-title').textContent = wasEdited ? 'Venta actualizada' : 'Venta registrada';
   $('#sales-success-number').textContent = sale.numero ? `Venta #${sale.numero}` : 'Venta guardada correctamente';
-  $('#sales-success-totals').innerHTML = `<div><span>Total venta</span><strong>${money(sale.total_venta)}</strong></div><div><span>Proveedor</span><strong>${money(sale.total_costo_proveedor)}</strong></div><div><span>Ganancia</span><strong>${money(sale.total_ganancia)}</strong></div>`;
+  $('#sales-success-totals').innerHTML = `<div><span>Total venta</span><strong>${money(sale.total_venta)}</strong></div><div><span>Proveedor recibe</span><strong>${money(sale.total_costo_proveedor)}</strong></div><div><span>Proveedor gana</span><strong>${money(selectedSale.details.reduce((acc, d) => acc + Number(d.cantidad) * (Number(d.costo_proveedor_unitario) - Number(d.costo_adquisicion_unitario ?? (Number(d.precio_base_historico || 0) * Number(d.factor_adquisicion_historico ?? 2.2)))), 0))}</strong></div><div><span>Nuestra ganancia neta</span><strong>${money(sale.total_ganancia)}</strong></div>`;
   $('#sales-success').hidden = false;
   document.body.classList.add('sales-modal-open');
 }
@@ -292,7 +297,7 @@ async function loadHistory() {
     return;
   }
   status.textContent = data.length ? `${data.length} ventas recientes.` : '';
-  list.innerHTML = data.map(sale => `<button type="button" class="sales-history-item" data-sale-id="${sale.id}"><div class="sales-history-main"><span class="sale-number">#${sale.numero || '—'}</span><div><strong>${escapeHtml(sale.cliente_nombre || 'Cliente no especificado')}</strong><small>${formatDate(sale.fecha)}${sale.metodo_pago ? ` · ${escapeHtml(sale.metodo_pago)}` : ''}</small></div></div><div class="sales-history-values"><span>Total <strong>${money(sale.total_venta)}</strong></span><span>Proveedor <strong>${money(sale.total_costo_proveedor)}</strong></span><span>Ganancia <strong>${money(sale.total_ganancia)}</strong></span></div><span class="sale-status ${sale.estado}">${escapeHtml(sale.estado)}</span></button>`).join('') || '<div class="sales-empty-state">Todavía no hay ventas registradas.</div>';
+  list.innerHTML = data.map(sale => `<button type="button" class="sales-history-item" data-sale-id="${sale.id}"><div class="sales-history-main"><span class="sale-number">#${sale.numero || '—'}</span><div><strong>${escapeHtml(sale.cliente_nombre || 'Cliente no especificado')}</strong><small>${formatDate(sale.fecha)}${sale.metodo_pago ? ` · ${escapeHtml(sale.metodo_pago)}` : ''}</small></div></div><div class="sales-history-values"><span>Total <strong>${money(sale.total_venta)}</strong></span><span>Proveedor recibe <strong>${money(sale.total_costo_proveedor)}</strong></span><span>Nuestra ganancia neta <strong>${money(sale.total_ganancia)}</strong></span></div><span class="sale-status ${sale.estado}">${escapeHtml(sale.estado)}</span></button>`).join('') || '<div class="sales-empty-state">Todavía no hay ventas registradas.</div>';
   list.querySelectorAll('[data-sale-id]').forEach(button => button.addEventListener('click', () => openSaleDetail(button.dataset.saleId)));
 }
 
@@ -306,7 +311,7 @@ async function openSaleDetail(saleId) {
   $('#sales-detail-title').textContent = `Venta #${sale.numero || '—'}`;
   $('#sales-detail-meta').textContent = `${formatDate(sale.fecha)} · ${sale.cliente_nombre || 'Cliente no especificado'}`;
   $('#sales-detail-items').innerHTML = selectedSale.details.map(item => `<div class="sales-detail-item"><div><strong>${escapeHtml(item.producto_nombre)}</strong><small>${item.cantidad} × ${money(item.precio_venta_unitario)}</small></div><strong>${money(item.subtotal)}</strong></div>`).join('');
-  $('#sales-detail-data').innerHTML = `<div><span>Teléfono</span><strong>${escapeHtml(sale.cliente_telefono || '—')}</strong></div><div><span>Pago</span><strong>${escapeHtml(sale.metodo_pago || '—')}</strong></div><div><span>Observación</span><strong>${escapeHtml(sale.observacion || '—')}</strong></div><div><span>Total</span><strong>${money(sale.total_venta)}</strong></div><div><span>Proveedor</span><strong>${money(sale.total_costo_proveedor)}</strong></div><div><span>Ganancia</span><strong>${money(sale.total_ganancia)}</strong></div>`;
+  $('#sales-detail-data').innerHTML = `<div><span>Teléfono</span><strong>${escapeHtml(sale.cliente_telefono || '—')}</strong></div><div><span>Pago</span><strong>${escapeHtml(sale.metodo_pago || '—')}</strong></div><div><span>Observación</span><strong>${escapeHtml(sale.observacion || '—')}</strong></div><div><span>Total</span><strong>${money(sale.total_venta)}</strong></div><div><span>Proveedor recibe</span><strong>${money(sale.total_costo_proveedor)}</strong></div><div><span>Nuestra ganancia neta</span><strong>${money(sale.total_ganancia)}</strong></div>`;
   const editable = context.role !== 'solo_lectura' && sale.estado === 'completada';
   $('#sales-detail-edit').hidden = !editable;
   $('#sales-detail-cancel').hidden = !editable;
@@ -324,7 +329,7 @@ async function beginEditSelectedSale() {
   originalSaleDetails = sale.details;
   cart = sale.details.map(detail => {
     const current = products.find(product => product.sku === detail.sku) || {};
-    return { ...current, id_detalle: detail.id, cart_key: detail.id, sku: detail.sku, nombre: detail.producto_nombre, imagen: detail.imagen_principal, stock: Number(current.stock) || 0, cantidad: Number(detail.cantidad), tipo_precio: detail.tipo_precio, precio_sugerido: Number(detail.precio_sugerido_unitario), precio_venta: Number(detail.precio_venta_unitario), costo_proveedor: Number(detail.costo_proveedor_unitario) };
+    return { ...current, id_detalle: detail.id, cart_key: detail.id, sku: detail.sku, nombre: detail.producto_nombre, imagen: detail.imagen_principal, stock: Number(current.stock) || 0, cantidad: Number(detail.cantidad), tipo_precio: detail.tipo_precio, precio_sugerido: Number(detail.precio_sugerido_unitario), precio_venta: Number(detail.precio_venta_unitario), costo_proveedor: Number(detail.costo_proveedor_unitario), costo_adquisicion: Number(detail.costo_adquisicion_unitario ?? (Number(detail.precio_base_historico || 0) * Number(detail.factor_adquisicion_historico ?? 2.2))) };
   });
   $('#sale-date').value = String(sale.fecha).slice(0, 10);
   $('#sale-client-name').value = sale.cliente_nombre || '';

@@ -352,10 +352,11 @@ function editor(p, i) {
   const stock = Number(i.stock || 0);
   const baseValue = i.precio_base ?? '';
   const costFactor = i.factor_costo ?? 2.6;
+  const acquisitionFactor = i.factor_adquisicion ?? 2.2;
   const ownCostValue = i.costo_propio ?? calculateOwnCost(baseValue, costFactor);
   const wholesaleValue = i.precio_mayorista ?? '';
   const retailValue = i.precio_minorista ?? '';
-  const providerProfit = calculateProfit(ownCostValue, baseValue);
+  const providerProfit = calculateProfit(ownCostValue, Number(baseValue) * Number(i.factor_adquisicion ?? 2.2));
   const wholesaleProfit = calculateProfit(wholesaleValue, ownCostValue);
   const retailProfit = calculateProfit(retailValue, ownCostValue);
   const wholesaleMultiplier = calculateMultiplier(baseValue, wholesaleValue, i.multiplicador_mayorista);
@@ -389,7 +390,7 @@ function editor(p, i) {
             <div class="price-box-title"><strong>Cálculo de mi costo</strong><span>Información interna</span></div>
             <div class="field-grid cost-fields">
               <label>Precio base (Bs)<input name="precio_base" type="number" min="0" step="0.01" inputmode="decimal" value="${baseValue}" autocomplete="off"><small>Lo que costó originalmente el producto a tu proveedor.</small></label>
-              <label>Factor de costo<input name="factor_costo" type="number" min="0" step="0.01" inputmode="decimal" value="${costFactor}"><small>Puedes modificarlo cuando corresponda.</small></label>
+              <label>Factor de adquisición<input name="factor_adquisicion" type="number" min="0.01" step="0.01" inputmode="decimal" value="${acquisitionFactor}"><small>Costo de adquisición del proveedor; se conserva históricamente al vender.</small></label><label>Factor de costo<input name="factor_costo" type="number" min="0" step="0.01" inputmode="decimal" value="${costFactor}"><small>Puedes modificarlo cuando corresponda.</small></label>
             </div>
             <div class="own-cost-result" aria-live="polite"><span>Proveedor recibe</span><strong data-own-cost>${formatAdminPrice(ownCostValue)}</strong><small>Precio base × factor de costo</small><em>Ganancia del proveedor: <b data-provider-profit>${formatAdminPrice(providerProfit)}</b></em></div>
           </div>
@@ -530,7 +531,7 @@ function bindCard(card) {
     costDisplay.dataset.costValue = form.costo_propio.value;
     if (card.querySelector('.cost-tile').classList.contains('cost-visible')) costDisplay.textContent = formatAdminPrice(form.costo_propio.value);
     const ownCost = form.costo_propio.value;
-    const providerProfit = calculateProfit(ownCost, form.precio_base.value);
+    const providerProfit = calculateProfit(ownCost, Number(form.precio_base.value) * Number(form.factor_adquisicion.value));
     const wholesaleProfit = calculateProfit(form.precio_mayorista.value, ownCost);
     const retailProfit = calculateProfit(form.precio_minorista.value, ownCost);
     card.querySelector('[data-card-wholesale]').textContent = formatAdminPrice(form.precio_mayorista.value);
@@ -569,6 +570,7 @@ function bindCard(card) {
 
   form.precio_base.addEventListener('input', updateOwnCost);
   form.factor_costo.addEventListener('input', updateOwnCost);
+  form.factor_adquisicion.addEventListener('input', updatePriceBadges);
   form.precio_mayorista.addEventListener('input', () => updateMultiplierFromPrice('mayorista'));
   form.precio_minorista.addEventListener('input', () => updateMultiplierFromPrice('minorista'));
   form.multiplicador_mayorista.addEventListener('input', () => updatePriceFromMultiplier('mayorista'));
@@ -609,7 +611,7 @@ async function save(event, sku) {
   const retailPrice = nullableNumber(form.precio_minorista.value);
   const modelName = form.nombre_modelo.value.trim() || null;
   const publicData = { nombre: form.nombre.value.trim(), nombre_modelo: modelName, codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: sanitizeRichHtml(form.descripcion.value), detalle_distintivo: sanitizeRichHtml(form.detalle_distintivo.value), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
-  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), actualizado_en:new Date().toISOString() };
+  const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), factor_adquisicion: nullableNumber(form.factor_adquisicion.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), actualizado_en:new Date().toISOString() };
   const modelCode = form.codigo_modelo.value.trim();
   const updates = [
     db.from('productos_publicos').update(publicData).eq('sku', sku),
@@ -824,7 +826,7 @@ function buildProfitabilityRow(product, inventory) {
   const providerReceives = Number(inventory.costo_propio) || calculateOwnCost(base, factor) || 0;
   const wholesalePrice = Number(inventory.precio_mayorista) || 0;
   const retailPrice = Number(inventory.precio_minorista) || 0;
-  const providerProfit = calculateProfit(providerReceives, base) || 0;
+  const providerProfit = calculateProfit(providerReceives, base * Number(inventory.factor_adquisicion ?? 2.2)) || 0;
   const wholesaleProfit = calculateProfit(wholesalePrice, providerReceives) || 0;
   const retailProfit = calculateProfit(retailPrice, providerReceives) || 0;
   return {

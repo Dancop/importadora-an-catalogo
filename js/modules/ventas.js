@@ -17,6 +17,7 @@ let loadingPromise = null;
 let products = [];
 let cart = [];
 let cartSequence = 0;
+let originalSaleDetails = [];
 let saving = false;
 let editingSaleId = null;
 let selectedSale = null;
@@ -147,7 +148,7 @@ function addProduct(sku, type) {
 }
 
 function availableForLine(item) {
-  const original = editingSaleId && selectedSale?.details || [];
+  const original = editingSaleId ? originalSaleDetails : [];
   const restored = original.filter(row => row.sku === item.sku).reduce((sum, row) => sum + Number(row.cantidad || 0), 0);
   const current = products.find(row => row.sku === item.sku);
   const occupied = cart.filter(row => row !== item && row.sku === item.sku).reduce((sum, row) => sum + Number(row.cantidad || 0), 0);
@@ -175,7 +176,7 @@ function bindCartItem(card) {
   const item = cart.find(row => String(row.cart_key || row.id_detalle) === card.dataset.cartKey);
   card.querySelector('[data-remove-cart]').addEventListener('click', () => { cart = cart.filter(row => row !== item); renderCart(); });
   card.querySelectorAll('[data-qty]').forEach(button => button.addEventListener('click', () => {
-    item.cantidad = Math.max(1, Math.min(availableForLine(item), item.cantidad + Number(button.dataset.qty)));
+    item.cantidad = Math.max(1, Math.min(Math.max(1, availableForLine(item)), item.cantidad + Number(button.dataset.qty)));
     renderCart();
   }));
   card.querySelector('[data-cart-quantity]').addEventListener('change', event => {
@@ -267,6 +268,7 @@ function closeSuccess() {
 
 function resetSale() {
   editingSaleId = null;
+  originalSaleDetails = [];
   cart = [];
   $('#sales-edit-banner')?.setAttribute('hidden', '');
   if ($('#sales-register')) $('#sales-register').textContent = 'Registrar venta';
@@ -319,6 +321,7 @@ async function beginEditSelectedSale() {
   closeSaleDetail();
   await ensureLoaded();
   editingSaleId = sale.id;
+  originalSaleDetails = sale.details;
   cart = sale.details.map(detail => {
     const current = products.find(product => product.sku === detail.sku) || {};
     return { ...current, id_detalle: detail.id, cart_key: detail.id, sku: detail.sku, nombre: detail.producto_nombre, imagen: detail.imagen_principal, stock: Number(current.stock) || 0, cantidad: Number(detail.cantidad), tipo_precio: detail.tipo_precio, precio_sugerido: Number(detail.precio_sugerido_unitario), precio_venta: Number(detail.precio_venta_unitario), costo_proveedor: Number(detail.costo_proveedor_unitario) };

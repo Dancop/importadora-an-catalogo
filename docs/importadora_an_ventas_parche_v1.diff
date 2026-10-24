@@ -8,6 +8,9 @@
 -    <article class="sales-cart-item" data-cart-sku="${escapeHtml(item.sku)}">
 +    <article class="sales-cart-item" data-cart-key="${escapeHtml(item.cart_key || item.id_detalle || item.sku)}">
 @@
+-  list.querySelectorAll('[data-cart-sku]').forEach(card => bindCartItem(card));
++  list.querySelectorAll('[data-cart-key]').forEach(card => bindCartItem(card));
+@@
 -  const item = cart.find(row => row.sku === card.dataset.cartSku);
 -  card.querySelector('[data-remove-cart]').addEventListener('click', () => { cart = cart.filter(row => row.sku !== item.sku); renderCart(); });
 +  const item = cart.find(row => String(row.cart_key || row.id_detalle || row.sku) === card.dataset.cartKey);

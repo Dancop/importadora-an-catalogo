@@ -1,0 +1,21 @@
+--- a/js/modules/ventas.js
++++ b/js/modules/ventas.js
+@@
+-  const existing = cart.find(item => item.sku === sku);
++  // Solo agrupar productos nuevos; no fusionar detalles históricos distintos.
++  const existing = cart.find(item => item.sku === sku && !item.id_detalle);
+@@
+-    <article class="sales-cart-item" data-cart-sku="${escapeHtml(item.sku)}">
++    <article class="sales-cart-item" data-cart-key="${escapeHtml(item.cart_key || item.id_detalle || item.sku)}">
+@@
+-  const item = cart.find(row => row.sku === card.dataset.cartSku);
+-  card.querySelector('[data-remove-cart]').addEventListener('click', () => { cart = cart.filter(row => row.sku !== item.sku); renderCart(); });
++  const item = cart.find(row => String(row.cart_key || row.id_detalle || row.sku) === card.dataset.cartKey);
++  card.querySelector('[data-remove-cart]').addEventListener('click', () => { cart = cart.filter(row => row !== item); renderCart(); });
+@@
+-    const payload = cart.map(item => ({
++    const payload = cart.map(item => ({
++      ...(editingSaleId && item.id_detalle ? { id_detalle: item.id_detalle } : {}),
+@@
+-    return { ...current, sku: detail.sku, nombre: detail.producto_nombre, imagen: detail.imagen_principal, stock: (Number(current.stock) || 0) + Number(detail.cantidad), cantidad: Number(detail.cantidad), tipo_precio: detail.tipo_precio, precio_sugerido: Number(detail.precio_sugerido_unitario), precio_venta: Number(detail.precio_venta_unitario), costo_proveedor: Number(detail.costo_proveedor_unitario) };
++    return { ...current, id_detalle: detail.id, cart_key: detail.id, sku: detail.sku, nombre: detail.producto_nombre, imagen: detail.imagen_principal, stock: (Number(current.stock) || 0) + Number(detail.cantidad), cantidad: Number(detail.cantidad), tipo_precio: detail.tipo_precio, precio_sugerido: Number(detail.precio_sugerido_unitario), precio_venta: Number(detail.precio_venta_unitario), costo_proveedor: Number(detail.costo_proveedor_unitario) };

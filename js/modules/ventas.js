@@ -211,7 +211,7 @@ async function registerSale() {
   const button = $('#sales-register');
   const message = $('#sales-save-message');
   button.disabled = true;
-  button.textContent = 'Registrando…';
+  button.textContent = editingSaleId ? 'Guardando cambios…' : 'Registrando…';
   message.textContent = '';
   try {
     const wasEdited = Boolean(editingSaleId);
@@ -248,7 +248,7 @@ async function registerSale() {
     message.textContent = friendlyError(error);
   } finally {
     saving = false;
-    button.textContent = 'Registrar venta';
+    button.textContent = editingSaleId ? 'Guardar cambios' : 'Registrar venta';
     renderTotals();
   }
 }

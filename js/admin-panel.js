@@ -721,13 +721,18 @@ async function removePhotos(card, urls) {
   const { data, error: readError } = await db.from('productos_publicos').select('imagenes,imagen_portada').eq('sku', sku).single();
   if (readError) { message.textContent = readError.message; return; }
   const remaining = (data.imagenes || []).filter(url => !urls.includes(url));
-  const { error: updateError } = await db.from('productos_publicos').update({ imagenes: remaining }).eq('sku', sku);
+  const coverRemoved = urls.includes(data.imagen_portada);
+  const nextCover = coverRemoved ? (remaining[0] || null) : data.imagen_portada;
+  const { error: updateError } = await db.from('productos_publicos').update({ imagenes: remaining, imagen_portada: nextCover }).eq('sku', sku);
   if (updateError) { message.textContent = updateError.message; return; }
   urls.forEach(url => card.querySelectorAll('.photo-list figure').forEach(figure => {
     if (figure.dataset.photoUrl === url) figure.remove();
   }));
   card.dataset.firstImage = remaining[0] || '';
-  card.querySelector('.admin-thumb').src = remaining[0] || data.imagen_portada || '../assets/logo.png';
+  card.querySelector('.admin-thumb').src = remaining[0] || nextCover || '../assets/logo.png';
+  card.querySelector('input[name="imagen_portada_actual"]').value = nextCover || '';
+  const coverPreview = card.querySelector('[data-cover-preview]');
+  if (coverPreview) coverPreview.src = nextCover || '../assets/logo.png';
   const { data: references, error: referenceError } = await db.from('productos_publicos').select('imagenes,imagen_portada');
   if (referenceError) { message.textContent = 'Fotos retiradas del producto. No se pudo comprobar su eliminación física.'; return; }
   const referenced = new Set(references.flatMap(item => [...(item.imagenes || []), item.imagen_portada].filter(Boolean)));

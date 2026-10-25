@@ -962,3 +962,22 @@ body.product-modal-open { overflow:hidden; }
 .photos-section .gallery-photo-actions .gallery-cover-action{background:#eaf0f4;border-color:#d3e0e8;color:#0e3048}
 .photos-section .gallery-photo-actions .gallery-cover-action:disabled{background:#dce9f2;color:#0e3048}
 @media(max-width:600px){.photos-section .photo-gallery-toolbar .gallery-delete-all{margin-left:0}}
+
+/* Controles de galería: selección contextual y menú por fotografía */
+.photos-section .gallery-bulk-actions:not([hidden]){display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.photos-section .gallery-bulk-actions span{font-weight:700;color:#0e3048}
+.photos-section .gallery-bulk-actions [data-delete-selected-photos]:not(:disabled){color:#92363c;border-color:#dfc4c6}
+.photos-section .gallery-bulk-actions [data-delete-selected-photos]:disabled{opacity:.45;cursor:not-allowed}
+.photos-section .gallery-photo-check[hidden]{display:none!important}
+.photos-section .gallery-photo-check:not([hidden]){display:flex;align-items:center;justify-content:center;min-width:34px;min-height:34px}
+.photos-section .gallery-photo-check input{width:18px;height:18px}
+.photos-section .gallery-photo.is-selected{outline:2px solid #587991;outline-offset:2px}
+.photos-section .gallery-photo-tools{grid-template-columns:1fr 1fr 1fr;align-items:start}
+.photos-section .gallery-photo-menu{position:relative;min-width:0}
+.photos-section .gallery-photo-menu summary{display:flex;justify-content:center;align-items:center;list-style:none;cursor:pointer;min-height:36px;background:#f7f9fa;border:1px solid #dce4e8;border-radius:7px;font-size:22px;color:#17374b}
+.photos-section .gallery-photo-menu summary::-webkit-details-marker{display:none}
+.photos-section .gallery-photo-menu[open]{z-index:5}
+.photos-section .gallery-photo-menu button{position:absolute;right:0;bottom:calc(100% + 5px);white-space:nowrap;z-index:6;box-shadow:0 4px 14px #071d2d2a;background:white!important;color:#92363c!important;padding:10px!important}
+.photos-section .gallery-v2.is-selecting .gallery-photo-actions{opacity:.45;pointer-events:none}
+.photos-section .gallery-v2.is-selecting .gallery-photo-frame a{cursor:pointer}
+@media(max-width:600px){.photos-section .gallery-bulk-actions:not([hidden]){gap:6px}.photos-section .gallery-bulk-actions button{padding:8px}}

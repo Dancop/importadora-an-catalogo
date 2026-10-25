@@ -3,7 +3,7 @@
 Importadora A&N
 Módulo: Panel administrativo
 Autor: Codex + Daniel
-Versión: 0.10.2
+Versión: 0.9.7
 Última modificación: 2026-10-25
 Descripción: Navegación, productos, configuración,
 rentabilidad y conexión con el dashboard.

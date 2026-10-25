@@ -951,3 +951,14 @@ body.product-modal-open { overflow:hidden; }
 .photos-section .gallery-photo-tools{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:5px}
 .photos-section .gallery-photo-tools .gallery-delete{background:#fff;color:#9c3434;font-size:12px}
 @media(max-width:600px){.photos-section .photo-list.gallery-v2{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.photos-section .gallery-photo-actions{padding:6px}.photos-section .gallery-photo-tools{gap:3px}.photos-section .gallery-photo-actions button{padding:9px 3px;font-size:12px}.photos-section .photo-gallery-toolbar small{width:100%}}
+
+/* Acciones destructivas y estado sin imágenes */
+.photos-section .photo-gallery-toolbar .gallery-delete-all{margin-left:auto;color:#8b3540;background:#fff;border-color:#d9b9be}
+.photos-section .gallery-empty{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:170px;border:1px dashed #cbd6dd;border-radius:12px;background:#f8fafb;color:#62717b;padding:20px;text-align:center}
+.photos-section .gallery-empty img{width:68px;height:68px;object-fit:contain}
+.photos-section .gallery-empty p{margin:0}
+.photos-section .gallery-v2 figure.is-cover{border-color:#587991}
+.photos-section .gallery-cover-badge:not([hidden]){background:#0e3048}
+.photos-section .gallery-photo-actions .gallery-cover-action{background:#eaf0f4;border-color:#d3e0e8;color:#0e3048}
+.photos-section .gallery-photo-actions .gallery-cover-action:disabled{background:#dce9f2;color:#0e3048}
+@media(max-width:600px){.photos-section .photo-gallery-toolbar .gallery-delete-all{margin-left:0}}

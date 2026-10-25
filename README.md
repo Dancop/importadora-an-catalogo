@@ -3,14 +3,16 @@
 Sistema web para catálogo, productos, inventario, ventas, finanzas, usuarios y configuración.
 
 ## Versión actual
-**0.10.2 — Navegación persistente y galería administrativa mejorada**
+**0.9.7 — Navegación persistente y galería administrativa mejorada**
 
-### Novedades de v0.10.2
+### Novedades de v0.9.7
 - El administrador conserva la sección al actualizar y permite enlaces como `#/productos`.
 - Galería con selección múltiple contextual, portada destacada, orden manual y eliminación segura.
 - Subida de fotografías con progreso individual (por ejemplo, 5 de 13) y aviso móvil de archivos seleccionados.
 - Guardado sin recargar todo el inventario; logo de respaldo cuando no hay imágenes.
 - Sin migraciones SQL. Detalles en [CHANGELOG](docs/CHANGELOG.md).
+
+> **Nota de versionado:** las entradas históricas v0.10.0 y v0.10.1 corresponden a una línea de trabajo del inventario que quedó pendiente de finalizar. Se conservan en el historial como trabajo pendiente, no como versiones funcionales aprobadas. La serie activa continúa desde v0.9.6.
 
 ### Novedades de v0.9.6
 - Nuevo campo "Nombre del modelo (aparece en la portada del catálogo)" en el panel administrativo, dentro de **2. Datos del producto**.

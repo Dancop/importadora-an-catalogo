@@ -446,7 +446,7 @@ function editor(p, i) {
             <section class="admin-form-section photos-section" aria-labelledby="photos-${attr(p.sku)}">
               <div class="admin-section-heading"><div><div><h3 id="photos-${attr(p.sku)}">Imágenes de la presentación</h3><p>Estas fotografías cambian cuando el cliente selecciona esta variante.</p></div></div></div>
               <div class="photo-gallery-intro"><strong>Galería de fotografías</strong><small>La imagen marcada con ★ es la portada del modelo. Elige otra desde esta misma galería y pulsa Guardar cambios.</small></div>
-              <div class="photo-gallery-upload"><label>Agregar fotografías <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><details class="special-cover-upload"><summary>Subir una portada especial (opcional)</summary><label>Imagen exclusiva para la portada del modelo<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label></details></div>
+              <div class="photo-gallery-upload"><label>Agregar fotografías <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div class="selected-files-info" data-files-info hidden></div><details class="special-cover-upload"><summary>Subir una portada especial (opcional)</summary><label>Imagen exclusiva para la portada del modelo<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label></details></div>
               <input name="imagen_portada_actual" type="hidden" value="${attr(coverImage)}">
               <div class="photo-gallery-toolbar"><button type="button" data-select-all-photos aria-pressed="false">☑ Seleccionar</button><div class="gallery-bulk-actions" hidden><span data-selection-count>0 seleccionadas</span><button type="button" data-check-all>Seleccionar todas</button><button type="button" data-delete-selected-photos disabled>🗑 Eliminar</button><button type="button" data-cancel-selection>Cancelar</button></div></div>
               <div class="photo-list gallery-v2">${(p.imagenes || []).map((url, n) => `<figure class="gallery-photo ${coverImage === url ? 'is-cover' : ''}" data-photo-url="${attr(url)}"><div class="gallery-photo-frame"><a href="${attr(url)}" target="_blank" rel="noopener" title="Ver fotografía completa"><img src="${attr(url)}" alt="Foto ${n+1}" loading="lazy"></a><span class="gallery-cover-badge" ${coverImage === url ? '' : 'hidden'}>★ Portada</span><label class="gallery-photo-check" hidden><input type="checkbox" data-select-photo aria-label="Seleccionar foto ${n+1}"></label></div><div class="gallery-photo-actions"><button type="button" class="gallery-cover-action" data-set-cover-photo ${coverImage === url ? 'disabled' : ''}>${coverImage === url ? '★ Portada actual' : '☆ Usar como portada'}</button><div class="gallery-photo-tools"><button type="button" data-move-photo="-1" title="Mover antes" aria-label="Mover fotografía antes">←</button><button type="button" data-move-photo="1" title="Mover después" aria-label="Mover fotografía después">→</button><button type="button" data-remove-photo="${attr(url)}" class="gallery-delete-icon" title="Eliminar fotografía" aria-label="Eliminar fotografía">🗑</button></div></div></figure>`).join('') || '<div class="gallery-empty"><img src="../assets/logo.png" alt="Logo Importadora A y N"><p>Este producto aún no tiene fotografías.</p></div>'}</div>
@@ -454,7 +454,7 @@ function editor(p, i) {
           </details>
         </div>
 
-        <p class="form-message" data-message></p>
+        <div class="upload-progress" data-upload-progress hidden role="status" aria-live="polite"><strong data-upload-text>Preparando fotografías…</strong><progress data-upload-bar value="0" max="1"></progress></div><p class="form-message" data-message></p>
         <div class="admin-actions sticky-save-actions"><button class="button primary" type="submit">Guardar cambios</button><button class="button secondary" type="button" data-copy>Copiar descripción</button><button class="button whatsapp" type="button" data-share>Compartir</button></div>
       </form>
     </details>
@@ -481,6 +481,12 @@ function bindCard(card) {
       form.imagen_portada_actual.value = '';
       refreshCoverGallery();
     }
+  });
+  form.photos.addEventListener('change', () => {
+    const count = form.photos.files.length;
+    const info = form.querySelector('[data-files-info]');
+    info.hidden = count === 0;
+    info.textContent = count ? `${count} fotografías seleccionadas. Pulsa «Guardar cambios» para comenzar a subirlas.` : '';
   });
   const updateHeader = () => {
     const name = form.nombre.value.trim() || 'Producto sin nombre';
@@ -646,16 +652,31 @@ function toggleCardCost(card, button) {
 
 async function save(event, sku) {
   event.preventDefault(); const form = event.currentTarget; const message = form.querySelector('[data-message]');
-  message.textContent = 'Guardando…';
+  message.textContent = 'Preparando guardado…';
+  const progressBox = form.querySelector('[data-upload-progress]');
+  const progressBar = form.querySelector('[data-upload-bar]');
+  const progressText = form.querySelector('[data-upload-text]');
+  const saveButton = form.querySelector('button[type="submit"]');
+  const selectedFiles = [...form.photos.files];
+  saveButton.disabled = true;
+  const showProgress = (completed, total, filename = '') => {
+    progressBox.hidden = false;
+    progressBar.max = Math.max(total, 1);
+    progressBar.value = completed;
+    progressText.textContent = completed < total
+      ? `Subiendo fotografía ${completed + 1} de ${total}${filename ? ': ' + filename : ''}`
+      : `${completed} de ${total} fotografías subidas. Guardando producto…`;
+  };
+  if (selectedFiles.length) showProgress(0, selectedFiles.length);
   const fixedSku = sku;
-  let images = [...form.querySelectorAll('.photo-list img')].map(i => i.src);
+  let images = [...form.querySelectorAll('.photo-list figure[data-photo-url]')].map(figure => figure.dataset.photoUrl);
   let coverUrl = form.imagen_portada_actual?.value || null;
   try {
-    images = images.concat(await uploadPhotos(fixedSku, [...form.photos.files], images.length));
+    images = images.concat(await uploadPhotos(fixedSku, selectedFiles, images.length, (completed, total, filename) => showProgress(completed, total, filename)));
     const coverFile = form.cover_photo?.files?.[0];
     if (coverFile) coverUrl = await uploadModelCover(form.codigo_modelo.value.trim() || fixedSku, coverFile);
   }
-  catch (e) { message.textContent = e.message; return; }
+  catch (e) { message.textContent = e.message; saveButton.disabled = false; progressBox.hidden = true; return; }
   const retailPrice = nullableNumber(form.precio_minorista.value);
   const modelName = form.nombre_modelo.value.trim() || null;
   const publicData = { nombre: form.nombre.value.trim(), nombre_modelo: modelName, codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: sanitizeRichHtml(form.descripcion.value), detalle_distintivo: sanitizeRichHtml(form.detalle_distintivo.value), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
@@ -669,7 +690,7 @@ async function save(event, sku) {
   if (modelCode && modelName) updates.push(db.from('productos_publicos').update({ nombre_modelo: modelName, actualizado_en:new Date().toISOString() }).eq('codigo_modelo', modelCode));
   const results = await Promise.all(updates);
   const failed = results.find(result => result.error)?.error;
-  if (failed) { message.textContent = `No se guardó: ${failed.message}`; return; }
+  if (failed) { message.textContent = `No se guardó: ${failed.message}`; saveButton.disabled = false; progressBox.hidden = true; return; }
   // Actualizar únicamente esta tarjeta, conservando el acordeón y la posición de lectura.
   const card = form.closest('.admin-card');
   const openSections = [...card.querySelectorAll('details')].map(section => section.open);
@@ -680,6 +701,8 @@ async function save(event, sku) {
   ]);
   if (publicReadError || privateReadError) {
     message.textContent = 'Cambios guardados. Actualiza la página para ver las fotos nuevas.';
+    saveButton.disabled = false;
+    progressBox.hidden = true;
     return;
   }
   publicProducts = publicProducts.map(product => product.sku === sku ? savedPublic : product);
@@ -704,15 +727,17 @@ async function uploadModelCover(modelCode, file) {
   return db.storage.from('productos').getPublicUrl(path).data.publicUrl;
 }
 
-async function uploadPhotos(sku, files, existing) {
+async function uploadPhotos(sku, files, existing, onProgress = () => {}) {
   
   const urls = [];
   for (let index = 0; index < files.length; index++) {
+    onProgress(index, files.length, files[index].name);
     const blob = await compress(files[index]);
     const path = `${sku}/${Date.now()}-${index}.jpg`;
     const { error } = await db.storage.from('productos').upload(path, blob, { contentType:'image/jpeg' });
     if (error) throw error;
     urls.push(db.storage.from('productos').getPublicUrl(path).data.publicUrl);
+    onProgress(index + 1, files.length);
   }
   return urls;
 }

@@ -3,8 +3,8 @@
 Importadora A&N
 Módulo: Panel administrativo
 Autor: Codex + Daniel
-Versión: 0.9.0
-Última modificación: 2026-08-03
+Versión: 0.10.2
+Última modificación: 2026-10-25
 Descripción: Navegación, productos, configuración,
 rentabilidad y conexión con el dashboard.
 ===========================================
@@ -45,7 +45,26 @@ const PANEL_TITLES = {
   'whatsapp-panel': 'WhatsApp'
 };
 
-function openAdminPanel(target) {
+const PANEL_PATHS = {
+  'dashboard-panel': 'inicio',
+  'products-panel': 'productos',
+  'sales-panel': 'ventas',
+  'profitability-panel': 'inventario',
+  'finance-panel': 'finanzas',
+  'users-panel': 'usuarios',
+  'catalog-settings-panel': 'configuracion',
+  'whatsapp-panel': 'whatsapp'
+};
+function panelFromHash() {
+  const slug = decodeURIComponent(location.hash.replace(/^#\/?/, '').split('?')[0]).toLowerCase();
+  return Object.keys(PANEL_PATHS).find(key => PANEL_PATHS[key] === slug) || 'dashboard-panel';
+}
+function openAdminPanel(target, updateAddress = true) {
+  if (!Object.hasOwn(PANEL_PATHS, target)) target = 'dashboard-panel';
+  if (updateAddress) {
+    const nextHash = '#/' + PANEL_PATHS[target];
+    if (location.hash !== nextHash) history.pushState({ panel: target }, '', nextHash);
+  }
   document.querySelectorAll('[data-admin-panel]').forEach(item => item.classList.toggle('active', item.dataset.adminPanel === target));
   document.querySelectorAll('[data-panel-section]').forEach(section => { section.hidden = section.id !== target; });
   document.querySelector('#admin-title').textContent = PANEL_TITLES[target] || 'Panel';
@@ -71,7 +90,9 @@ export async function initializeAdminPanel(role, profile) {
   initializeDashboard({ db, profile, openPanel: openAdminPanel });
   initializeSales({ db, role, profile, openPanel: openAdminPanel, onSaleRegistered: () => { productsLoaded = false; refreshDashboard(); } });
   initializeMobileMoreMenu();
-  openAdminPanel('dashboard-panel');
+  openAdminPanel(panelFromHash(), false);
+  window.addEventListener('hashchange', () => openAdminPanel(panelFromHash(), false));
+  window.addEventListener('popstate', () => openAdminPanel(panelFromHash(), false));
   // Productos e inventario se cargan únicamente cuando el usuario abre esos módulos.
 }
 

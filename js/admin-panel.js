@@ -445,23 +445,11 @@ function editor(p, i) {
             <summary><span><b>4</b> Fotografías</span><small>${(p.imagenes || []).length} imagen(es)</small></summary>
             <section class="admin-form-section photos-section" aria-labelledby="photos-${attr(p.sku)}">
               <div class="admin-section-heading"><div><div><h3 id="photos-${attr(p.sku)}">Imágenes de la presentación</h3><p>Estas fotografías cambian cuando el cliente selecciona esta variante.</p></div></div></div>
-              <div class="cover-admin-box">
-                <div class="cover-admin-preview">
-                  <img src="${attr(coverImage || thumbnail)}" alt="Portada actual del modelo" data-cover-preview>
-                  <div><strong>Imagen de portada del modelo</strong><small>Debe mostrar claramente todas las presentaciones. Se comparte entre los productos con el mismo código de modelo.</small></div>
-                </div>
-                <div class="existing-cover-picker">
-                  <div class="existing-cover-heading"><strong>Elegir de las imágenes ya subidas</strong><small>Selecciona una fotografía del modelo sin volver a cargarla.</small></div>
-                  <div class="existing-cover-options" role="radiogroup" aria-label="Imágenes disponibles para portada">
-                    ${modelImageOptions.length ? modelImageOptions.map((option, optionIndex) => `<label class="existing-cover-option ${coverImage === option.url ? 'selected' : ''}"><input type="radio" name="existing_cover" value="${attr(option.url)}" ${coverImage === option.url ? 'checked' : ''}><img src="${attr(option.url)}" alt="${attr(option.label)}"><span>${text(option.label)}</span><small>${text(option.sku)}</small></label>`).join('') : '<p class="empty-cover-options">Todavía no hay fotografías disponibles en este modelo.</p>'}
-                  </div>
-                </div>
-                <label>O subir una portada nueva<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
-                <input name="imagen_portada_actual" type="hidden" value="${attr(coverImage)}">
-              </div>
-              <label>Agregar fotografías de esta presentación<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
-              <div class="photo-gallery-toolbar"><button type="button" data-select-all-photos>Seleccionar todas</button><button type="button" data-delete-selected-photos>Eliminar seleccionadas</button><small>Usa las flechas para ordenar; guarda los cambios para conservar el orden.</small></div>
-              <div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure data-photo-url="${attr(url)}"><label><input type="checkbox" data-select-photo> Seleccionar</label><a href="${attr(url)}" target="_blank" rel="noopener"><img src="${attr(url)}" alt="Foto ${n+1}"></a><div class="photo-actions"><button type="button" data-move-photo="-1" aria-label="Mover foto hacia atrás">←</button><button type="button" data-move-photo="1" aria-label="Mover foto hacia adelante">→</button><button type="button" data-set-cover-photo>Portada</button><button type="button" data-remove-photo="${attr(url)}">Eliminar</button></div></figure>`).join('')}</div>
+              <div class="photo-gallery-intro"><strong>Galería de fotografías</strong><small>La imagen marcada con ★ es la portada del modelo. Elige otra desde esta misma galería y pulsa Guardar cambios.</small></div>
+              <div class="photo-gallery-upload"><label>Agregar fotografías <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><details class="special-cover-upload"><summary>Subir una portada especial (opcional)</summary><label>Imagen exclusiva para la portada del modelo<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label></details></div>
+              <input name="imagen_portada_actual" type="hidden" value="${attr(coverImage)}">
+              <div class="photo-gallery-toolbar"><button type="button" data-select-all-photos>Seleccionar varias</button><button type="button" data-delete-selected-photos hidden>Eliminar seleccionadas</button><small>Ordena con las flechas y guarda los cambios.</small></div>
+              <div class="photo-list gallery-v2">${(p.imagenes || []).map((url, n) => `<figure class="gallery-photo ${coverImage === url ? 'is-cover' : ''}" data-photo-url="${attr(url)}"><div class="gallery-photo-frame"><a href="${attr(url)}" target="_blank" rel="noopener" title="Ver fotografía completa"><img src="${attr(url)}" alt="Foto ${n+1}" loading="lazy"></a><span class="gallery-cover-badge" ${coverImage === url ? '' : 'hidden'}>★ Portada</span><label class="gallery-photo-check" hidden><input type="checkbox" data-select-photo aria-label="Seleccionar foto ${n+1}"></label></div><div class="gallery-photo-actions"><button type="button" class="gallery-cover-action" data-set-cover-photo ${coverImage === url ? 'disabled' : ''}>${coverImage === url ? '★ Portada actual' : '☆ Usar como portada'}</button><div class="gallery-photo-tools"><button type="button" data-move-photo="-1" title="Mover antes" aria-label="Mover fotografía antes">←</button><button type="button" data-move-photo="1" title="Mover después" aria-label="Mover fotografía después">→</button><button type="button" data-remove-photo="${attr(url)}" class="gallery-delete" title="Eliminar fotografía" aria-label="Eliminar fotografía">Eliminar</button></div></div></figure>`).join('')}</div>
             </section>
           </details>
         </div>
@@ -477,28 +465,23 @@ function bindCard(card) {
   bindColorControl(form, 'exterior');
   bindColorControl(form, 'interior');
   bindRichEditors(form);
-  form.querySelectorAll('input[name="existing_cover"]').forEach(input => {
-    input.addEventListener('change', () => {
-      if (!input.checked) return;
-      form.imagen_portada_actual.value = input.value;
-      const preview = form.querySelector('[data-cover-preview]');
-      if (preview) preview.src = input.value;
-      form.querySelectorAll('.existing-cover-option').forEach(option => {
-        option.classList.toggle('selected', option.contains(input));
-      });
-      if (form.cover_photo) form.cover_photo.value = '';
+  const refreshCoverGallery = () => {
+    const selected = form.imagen_portada_actual.value;
+    form.querySelectorAll('.gallery-photo').forEach(figure => {
+      const isCover = figure.dataset.photoUrl === selected;
+      figure.classList.toggle('is-cover', isCover);
+      const badge = figure.querySelector('.gallery-cover-badge');
+      if (badge) badge.hidden = !isCover;
+      const button = figure.querySelector('[data-set-cover-photo]');
+      if (button) { button.disabled = isCover; button.textContent = isCover ? '★ Portada actual' : '☆ Usar como portada'; }
     });
+  };
+  form.cover_photo?.addEventListener('change', () => {
+    if (form.cover_photo.files?.length) {
+      form.imagen_portada_actual.value = '';
+      refreshCoverGallery();
+    }
   });
-
-  form.cover_photo?.addEventListener('change', event => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const preview = form.querySelector('[data-cover-preview]');
-    if (preview) preview.src = URL.createObjectURL(file);
-    form.querySelectorAll('input[name="existing_cover"]').forEach(input => { input.checked = false; });
-    form.querySelectorAll('.existing-cover-option').forEach(option => option.classList.remove('selected'));
-  });
-
   const updateHeader = () => {
     const name = form.nombre.value.trim() || 'Producto sin nombre';
     const sku = card.dataset.sku;
@@ -594,18 +577,20 @@ function bindCard(card) {
     }
     if (button.hasAttribute('data-set-cover-photo')) {
       form.imagen_portada_actual.value = figure.dataset.photoUrl;
-      const preview = form.querySelector('[data-cover-preview]');
-      if (preview) preview.src = figure.dataset.photoUrl;
       if (form.cover_photo) form.cover_photo.value = '';
-      form.querySelectorAll('input[name="existing_cover"]').forEach(input => { input.checked = input.value === figure.dataset.photoUrl; });
-      form.querySelectorAll('.existing-cover-option').forEach(option => option.classList.toggle('selected', !!option.querySelector('input:checked')));
+      refreshCoverGallery();
+      form.querySelector('[data-message]').textContent = 'Portada seleccionada. Pulsa Guardar cambios para aplicarla.';
     }
     if (button.hasAttribute('data-remove-photo')) await removePhotos(card, [figure.dataset.photoUrl]);
   });
-  form.querySelector('[data-select-all-photos]')?.addEventListener('click', () => {
-    const checks = [...gallery.querySelectorAll('[data-select-photo]')];
-    const next = checks.some(input => !input.checked);
-    checks.forEach(input => { input.checked = next; });
+  const selectButton = form.querySelector('[data-select-all-photos]');
+  const deleteSelected = form.querySelector('[data-delete-selected-photos]');
+  selectButton?.addEventListener('click', () => {
+    const enabled = selectButton.dataset.active !== 'true';
+    selectButton.dataset.active = String(enabled);
+    selectButton.textContent = enabled ? 'Cancelar selección' : 'Seleccionar varias';
+    deleteSelected.hidden = !enabled;
+    gallery.querySelectorAll('.gallery-photo-check').forEach(label => { label.hidden = !enabled; label.querySelector('input').checked = false; });
   });
   form.querySelector('[data-delete-selected-photos]')?.addEventListener('click', async () => {
     const urls = [...gallery.querySelectorAll('figure')].filter(figure => figure.querySelector('[data-select-photo]')?.checked).map(figure => figure.dataset.photoUrl);
@@ -747,6 +732,14 @@ async function removePhotos(card, urls) {
     const { error: storageError } = await db.storage.from('productos').remove(paths);
     if (storageError) { message.textContent = 'Fotos retiradas del producto; Storage requiere revisión: ' + storageError.message; return; }
   }
+  card.querySelectorAll('.gallery-photo').forEach(figure => {
+    const isCover = figure.dataset.photoUrl === (nextCover || '');
+    figure.classList.toggle('is-cover', isCover);
+    figure.querySelector('.gallery-cover-badge').hidden = !isCover;
+    const btn = figure.querySelector('[data-set-cover-photo]');
+    btn.disabled = isCover;
+    btn.textContent = isCover ? '★ Portada actual' : '☆ Usar como portada';
+  });
   message.textContent = 'Fotografías eliminadas. La galería permanece abierta.';
 }
 

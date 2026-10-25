@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 0.10.2 — 2026-10-25
+### Navegación y gestión de fotografías
+- Las secciones del administrador tienen enlaces persistentes mediante fragmentos de URL: `#/inicio`, `#/productos`, `#/ventas`, `#/inventario`, `#/finanzas`, `#/usuarios`, `#/configuracion` y `#/whatsapp`.
+- Actualizar el navegador conserva la sección; los botones Atrás y Adelante recuperan la vista.
+- Se usa un fragmento `#/` en lugar de una ruta directa `/productos` para mantener compatibilidad con alojamiento estático sin reglas de reescritura.
+- Galería administrativa compacta: portada señalizada, orden manual, selección contextual y eliminación individual o por lotes con confirmación.
+- Indicador de progreso por imagen al subir archivos y aviso visible del total seleccionado en móvil.
+- Guardar un producto actualiza su tarjeta sin recargar el listado completo.
+- Cuando no hay fotografías se muestra el logo del proyecto.
+- No requiere cambios SQL.
+
+
 ## 0.10.1 — 2026-09-27
 ### Changed — Panel de productos: fila de precios editable + ventana de detalles
 - Se reemplazó el acordeón por producto (que causaba scroll largo y mezclaba portada del modelo con cada presentación) por una nueva estructura de dos niveles:

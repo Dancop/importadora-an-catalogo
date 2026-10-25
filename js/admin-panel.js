@@ -448,8 +448,8 @@ function editor(p, i) {
               <div class="photo-gallery-intro"><strong>Galería de fotografías</strong><small>La imagen marcada con ★ es la portada del modelo. Elige otra desde esta misma galería y pulsa Guardar cambios.</small></div>
               <div class="photo-gallery-upload"><label>Agregar fotografías <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><details class="special-cover-upload"><summary>Subir una portada especial (opcional)</summary><label>Imagen exclusiva para la portada del modelo<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label></details></div>
               <input name="imagen_portada_actual" type="hidden" value="${attr(coverImage)}">
-              <div class="photo-gallery-toolbar"><button type="button" data-select-all-photos>Seleccionar varias</button><button type="button" data-delete-selected-photos hidden>Eliminar seleccionadas</button><button type="button" data-delete-all-photos class="gallery-delete-all" ${(p.imagenes || []).length ? "" : "hidden"}>Eliminar todas</button><small>Ordena con las flechas y guarda los cambios.</small></div>
-              <div class="photo-list gallery-v2">${(p.imagenes || []).map((url, n) => `<figure class="gallery-photo ${coverImage === url ? 'is-cover' : ''}" data-photo-url="${attr(url)}"><div class="gallery-photo-frame"><a href="${attr(url)}" target="_blank" rel="noopener" title="Ver fotografía completa"><img src="${attr(url)}" alt="Foto ${n+1}" loading="lazy"></a><span class="gallery-cover-badge" ${coverImage === url ? '' : 'hidden'}>★ Portada</span><label class="gallery-photo-check" hidden><input type="checkbox" data-select-photo aria-label="Seleccionar foto ${n+1}"></label></div><div class="gallery-photo-actions"><button type="button" class="gallery-cover-action" data-set-cover-photo ${coverImage === url ? 'disabled' : ''}>${coverImage === url ? '★ Portada actual' : '☆ Usar como portada'}</button><div class="gallery-photo-tools"><button type="button" data-move-photo="-1" title="Mover antes" aria-label="Mover fotografía antes">←</button><button type="button" data-move-photo="1" title="Mover después" aria-label="Mover fotografía después">→</button><button type="button" data-remove-photo="${attr(url)}" class="gallery-delete" title="Eliminar fotografía" aria-label="Eliminar fotografía">Eliminar</button></div></div></figure>`).join('') || '<div class="gallery-empty"><img src="../assets/logo.png" alt="Logo Importadora A y N"><p>Este producto aún no tiene fotografías.</p></div>'}</div>
+              <div class="photo-gallery-toolbar"><button type="button" data-select-all-photos aria-pressed="false">☑ Seleccionar</button><div class="gallery-bulk-actions" hidden><span data-selection-count>0 seleccionadas</span><button type="button" data-check-all>Seleccionar todas</button><button type="button" data-delete-selected-photos disabled>🗑 Eliminar</button><button type="button" data-cancel-selection>Cancelar</button></div></div>
+              <div class="photo-list gallery-v2">${(p.imagenes || []).map((url, n) => `<figure class="gallery-photo ${coverImage === url ? 'is-cover' : ''}" data-photo-url="${attr(url)}"><div class="gallery-photo-frame"><a href="${attr(url)}" target="_blank" rel="noopener" title="Ver fotografía completa"><img src="${attr(url)}" alt="Foto ${n+1}" loading="lazy"></a><span class="gallery-cover-badge" ${coverImage === url ? '' : 'hidden'}>★ Portada</span><label class="gallery-photo-check" hidden><input type="checkbox" data-select-photo aria-label="Seleccionar foto ${n+1}"></label></div><div class="gallery-photo-actions"><button type="button" class="gallery-cover-action" data-set-cover-photo ${coverImage === url ? 'disabled' : ''}>${coverImage === url ? '★ Portada actual' : '☆ Usar como portada'}</button><div class="gallery-photo-tools"><button type="button" data-move-photo="-1" title="Mover antes" aria-label="Mover fotografía antes">←</button><button type="button" data-move-photo="1" title="Mover después" aria-label="Mover fotografía después">→</button><details class="gallery-photo-menu"><summary title="Más opciones" aria-label="Más opciones de fotografía">⋯</summary><button type="button" data-remove-photo="${attr(url)}" class="gallery-delete">🗑 Eliminar foto</button></details></div></div></figure>`).join('') || '<div class="gallery-empty"><img src="../assets/logo.png" alt="Logo Importadora A y N"><p>Este producto aún no tiene fotografías.</p></div>'}</div>
             </section>
           </details>
         </div>
@@ -584,21 +584,52 @@ function bindCard(card) {
     if (button.hasAttribute('data-remove-photo')) await removePhotos(card, [figure.dataset.photoUrl]);
   });
   const selectButton = form.querySelector('[data-select-all-photos]');
+  const bulkActions = form.querySelector('.gallery-bulk-actions');
   const deleteSelected = form.querySelector('[data-delete-selected-photos]');
-  selectButton?.addEventListener('click', () => {
-    const enabled = selectButton.dataset.active !== 'true';
-    selectButton.dataset.active = String(enabled);
-    selectButton.textContent = enabled ? 'Cancelar selección' : 'Seleccionar varias';
-    deleteSelected.hidden = !enabled;
-    gallery.querySelectorAll('.gallery-photo-check').forEach(label => { label.hidden = !enabled; label.querySelector('input').checked = false; });
+  const checkboxes = () => [...gallery.querySelectorAll('[data-select-photo]')];
+  const updateSelection = () => {
+    const count = checkboxes().filter(input => input.checked).length;
+    form.querySelector('[data-selection-count]').textContent = `${count} seleccionada${count === 1 ? '' : 's'}`;
+    deleteSelected.disabled = count === 0;
+    gallery.querySelectorAll('.gallery-photo').forEach(figure => figure.classList.toggle('is-selected', !!figure.querySelector('[data-select-photo]')?.checked));
+  };
+  const setSelectionMode = enabled => {
+    selectButton.hidden = enabled;
+    selectButton.setAttribute('aria-pressed', String(enabled));
+    bulkActions.hidden = !enabled;
+    gallery.classList.toggle('is-selecting', enabled);
+    gallery.querySelectorAll('.gallery-photo-check').forEach(label => {
+      label.hidden = !enabled;
+      label.querySelector('input').checked = false;
+    });
+    updateSelection();
+  };
+  selectButton.addEventListener('click', () => setSelectionMode(true));
+  form.querySelector('[data-cancel-selection]').addEventListener('click', () => setSelectionMode(false));
+  form.querySelector('[data-check-all]').addEventListener('click', () => {
+    const all = checkboxes();
+    const shouldCheck = all.some(input => !input.checked);
+    all.forEach(input => { input.checked = shouldCheck; });
+    updateSelection();
   });
-  form.querySelector('[data-delete-all-photos]')?.addEventListener('click', async () => {
-    const urls = [...gallery.querySelectorAll('figure[data-photo-url]')].map(figure => figure.dataset.photoUrl);
-    if (urls.length) await removePhotos(card, urls);
+  gallery.addEventListener('change', event => {
+    if (event.target.matches('[data-select-photo]')) updateSelection();
   });
-  form.querySelector('[data-delete-selected-photos]')?.addEventListener('click', async () => {
-    const urls = [...gallery.querySelectorAll('figure')].filter(figure => figure.querySelector('[data-select-photo]')?.checked).map(figure => figure.dataset.photoUrl);
-    if (urls.length) await removePhotos(card, urls);
+  gallery.addEventListener('click', event => {
+    if (!gallery.classList.contains('is-selecting')) return;
+    const anchor = event.target.closest('.gallery-photo-frame a');
+    if (!anchor) return;
+    event.preventDefault();
+    const checkbox = anchor.closest('figure').querySelector('[data-select-photo]');
+    checkbox.checked = !checkbox.checked;
+    updateSelection();
+  });
+  deleteSelected.addEventListener('click', async () => {
+    const urls = [...gallery.querySelectorAll('figure[data-photo-url]')].filter(figure => figure.querySelector('[data-select-photo]')?.checked).map(figure => figure.dataset.photoUrl);
+    if (urls.length) {
+      await removePhotos(card, urls);
+      setSelectionMode(false);
+    }
   });
 }
 
@@ -742,7 +773,7 @@ async function removePhotos(card, urls) {
   }));
   const gallery = card.querySelector('.photo-list');
   if (!remaining.length && gallery && !gallery.querySelector('.gallery-empty')) gallery.innerHTML = '<div class="gallery-empty"><img src="../assets/logo.png" alt="Logo Importadora A y N"><p>Este producto aún no tiene fotografías.</p></div>';
-  card.querySelector('[data-delete-all-photos]').hidden = !remaining.length;
+
   const photoCount = card.querySelector('.photos-section')?.closest('details')?.querySelector('summary small');
   if (photoCount) photoCount.textContent = `${remaining.length} imagen(es)`;
   card.dataset.firstImage = remaining[0] || '';

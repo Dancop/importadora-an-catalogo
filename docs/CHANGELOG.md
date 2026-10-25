@@ -1,6 +1,8 @@
 # CHANGELOG
 
-## 0.10.2 — 2026-10-25
+> **Versión activa: v0.9.7.** La línea v0.10.x del inventario consolidado quedó pendiente. Sus entradas se mantienen por trazabilidad, pero no representan funcionalidades terminadas ni aprobadas. No se revierten automáticamente cambios de código o base de datos asociados.
+
+## 0.9.7 — 2026-10-25
 ### Navegación y gestión de fotografías
 - Las secciones del administrador tienen enlaces persistentes mediante fragmentos de URL: `#/inicio`, `#/productos`, `#/ventas`, `#/inventario`, `#/finanzas`, `#/usuarios`, `#/configuracion` y `#/whatsapp`.
 - Actualizar el navegador conserva la sección; los botones Atrás y Adelante recuperan la vista.
@@ -12,7 +14,7 @@
 - No requiere cambios SQL.
 
 
-## 0.10.1 — 2026-09-27
+## 0.10.1 — 2026-09-27 (trabajo pendiente; no considerar versión validada)
 ### Changed — Panel de productos: fila de precios editable + ventana de detalles
 - Se reemplazó el acordeón por producto (que causaba scroll largo y mezclaba portada del modelo con cada presentación) por una nueva estructura de dos niveles:
   - **Barra de modelo** (una línea, arriba de cada grupo): nombre y portada del modelo, editables en una ventana flotante ("Nombre y portada"), sin repetirse por presentación.
@@ -24,7 +26,7 @@
 ### Database
 - Sin cambios de esquema. Usa las mismas columnas de `productos_publicos` e `inventario_privado` ya existentes.
 
-## 0.10.0 — 2026-09-26
+## 0.10.0 — 2026-09-26 (inventario consolidado pendiente de finalizar)
 ### Added — Módulo de inventario consolidado por grupos (primera capa)
 - Tablas nuevas: `grupos` (ciudades/sedes), `usuarios_grupo`, `stock_por_grupo`, `movimientos_inventario_grupo`, `transferencias` y `detalle_transferencias`.
 - Transferencias entre grupos con recepción obligatoria (estado `en_transito` hasta confirmar).

@@ -981,3 +981,7 @@ body.product-modal-open { overflow:hidden; }
 .photos-section .gallery-v2.is-selecting .gallery-photo-actions{opacity:.45;pointer-events:none}
 .photos-section .gallery-v2.is-selecting .gallery-photo-frame a{cursor:pointer}
 @media(max-width:600px){.photos-section .gallery-bulk-actions:not([hidden]){gap:6px}.photos-section .gallery-bulk-actions button{padding:8px}}
+
+/* Botón directo de eliminación: solo icono, sin menú desplegable */
+.photos-section .gallery-photo-tools .gallery-delete-icon{display:flex;align-items:center;justify-content:center;min-height:36px;width:100%;font-size:17px;background:#fff;color:#9c3434;border:1px solid #e3d3d5;border-radius:7px;cursor:pointer}
+.photos-section .gallery-photo-tools .gallery-delete-icon:hover{background:#fff1f1;color:#82252c}

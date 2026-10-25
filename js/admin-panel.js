@@ -347,7 +347,7 @@ function richText(value) {
 function editor(p, i) {
   const firstImage = (p.imagenes || [])[0] || '';
   const coverImage = p.imagen_portada || '';
-  const modelImageOptions = getModelImageOptions(p);
+  
   const thumbnail = firstImage || coverImage || '../assets/logo.png';
   const stock = Number(i.stock || 0);
   const baseValue = i.precio_base ?? '';
@@ -448,8 +448,8 @@ function editor(p, i) {
               <div class="photo-gallery-intro"><strong>Galería de fotografías</strong><small>La imagen marcada con ★ es la portada del modelo. Elige otra desde esta misma galería y pulsa Guardar cambios.</small></div>
               <div class="photo-gallery-upload"><label>Agregar fotografías <input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><details class="special-cover-upload"><summary>Subir una portada especial (opcional)</summary><label>Imagen exclusiva para la portada del modelo<input name="cover_photo" type="file" accept="image/jpeg,image/png,image/webp"></label></details></div>
               <input name="imagen_portada_actual" type="hidden" value="${attr(coverImage)}">
-              <div class="photo-gallery-toolbar"><button type="button" data-select-all-photos>Seleccionar varias</button><button type="button" data-delete-selected-photos hidden>Eliminar seleccionadas</button><small>Ordena con las flechas y guarda los cambios.</small></div>
-              <div class="photo-list gallery-v2">${(p.imagenes || []).map((url, n) => `<figure class="gallery-photo ${coverImage === url ? 'is-cover' : ''}" data-photo-url="${attr(url)}"><div class="gallery-photo-frame"><a href="${attr(url)}" target="_blank" rel="noopener" title="Ver fotografía completa"><img src="${attr(url)}" alt="Foto ${n+1}" loading="lazy"></a><span class="gallery-cover-badge" ${coverImage === url ? '' : 'hidden'}>★ Portada</span><label class="gallery-photo-check" hidden><input type="checkbox" data-select-photo aria-label="Seleccionar foto ${n+1}"></label></div><div class="gallery-photo-actions"><button type="button" class="gallery-cover-action" data-set-cover-photo ${coverImage === url ? 'disabled' : ''}>${coverImage === url ? '★ Portada actual' : '☆ Usar como portada'}</button><div class="gallery-photo-tools"><button type="button" data-move-photo="-1" title="Mover antes" aria-label="Mover fotografía antes">←</button><button type="button" data-move-photo="1" title="Mover después" aria-label="Mover fotografía después">→</button><button type="button" data-remove-photo="${attr(url)}" class="gallery-delete" title="Eliminar fotografía" aria-label="Eliminar fotografía">Eliminar</button></div></div></figure>`).join('')}</div>
+              <div class="photo-gallery-toolbar"><button type="button" data-select-all-photos>Seleccionar varias</button><button type="button" data-delete-selected-photos hidden>Eliminar seleccionadas</button><button type="button" data-delete-all-photos class="gallery-delete-all" ${(p.imagenes || []).length ? "" : "hidden"}>Eliminar todas</button><small>Ordena con las flechas y guarda los cambios.</small></div>
+              <div class="photo-list gallery-v2">${(p.imagenes || []).map((url, n) => `<figure class="gallery-photo ${coverImage === url ? 'is-cover' : ''}" data-photo-url="${attr(url)}"><div class="gallery-photo-frame"><a href="${attr(url)}" target="_blank" rel="noopener" title="Ver fotografía completa"><img src="${attr(url)}" alt="Foto ${n+1}" loading="lazy"></a><span class="gallery-cover-badge" ${coverImage === url ? '' : 'hidden'}>★ Portada</span><label class="gallery-photo-check" hidden><input type="checkbox" data-select-photo aria-label="Seleccionar foto ${n+1}"></label></div><div class="gallery-photo-actions"><button type="button" class="gallery-cover-action" data-set-cover-photo ${coverImage === url ? 'disabled' : ''}>${coverImage === url ? '★ Portada actual' : '☆ Usar como portada'}</button><div class="gallery-photo-tools"><button type="button" data-move-photo="-1" title="Mover antes" aria-label="Mover fotografía antes">←</button><button type="button" data-move-photo="1" title="Mover después" aria-label="Mover fotografía después">→</button><button type="button" data-remove-photo="${attr(url)}" class="gallery-delete" title="Eliminar fotografía" aria-label="Eliminar fotografía">Eliminar</button></div></div></figure>`).join('') || '<div class="gallery-empty"><img src="../assets/logo.png" alt="Logo Importadora A y N"><p>Este producto aún no tiene fotografías.</p></div>'}</div>
             </section>
           </details>
         </div>
@@ -592,6 +592,10 @@ function bindCard(card) {
     deleteSelected.hidden = !enabled;
     gallery.querySelectorAll('.gallery-photo-check').forEach(label => { label.hidden = !enabled; label.querySelector('input').checked = false; });
   });
+  form.querySelector('[data-delete-all-photos]')?.addEventListener('click', async () => {
+    const urls = [...gallery.querySelectorAll('figure[data-photo-url]')].map(figure => figure.dataset.photoUrl);
+    if (urls.length) await removePhotos(card, urls);
+  });
   form.querySelector('[data-delete-selected-photos]')?.addEventListener('click', async () => {
     const urls = [...gallery.querySelectorAll('figure')].filter(figure => figure.querySelector('[data-select-photo]')?.checked).map(figure => figure.dataset.photoUrl);
     if (urls.length) await removePhotos(card, urls);
@@ -634,7 +638,30 @@ async function save(event, sku) {
   if (modelCode && modelName) updates.push(db.from('productos_publicos').update({ nombre_modelo: modelName, actualizado_en:new Date().toISOString() }).eq('codigo_modelo', modelCode));
   const results = await Promise.all(updates);
   const failed = results.find(result => result.error)?.error;
-  if (failed) message.textContent = `No se guardó: ${failed.message}`; else { message.textContent = 'Cambios guardados.'; setTimeout(loadProducts, 700); }
+  if (failed) { message.textContent = `No se guardó: ${failed.message}`; return; }
+  // Actualizar únicamente esta tarjeta, conservando el acordeón y la posición de lectura.
+  const card = form.closest('.admin-card');
+  const openSections = [...card.querySelectorAll('details')].map(section => section.open);
+  const scrollBefore = window.scrollY;
+  const [{ data: savedPublic, error: publicReadError }, { data: savedPrivate, error: privateReadError }] = await Promise.all([
+    db.from('productos_publicos').select('*').eq('sku', sku).single(),
+    db.from('inventario_privado').select('*').eq('sku', sku).single()
+  ]);
+  if (publicReadError || privateReadError) {
+    message.textContent = 'Cambios guardados. Actualiza la página para ver las fotos nuevas.';
+    return;
+  }
+  publicProducts = publicProducts.map(product => product.sku === sku ? savedPublic : product);
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = editor(savedPublic, savedPrivate);
+  const refreshed = wrapper.firstElementChild;
+  card.replaceWith(refreshed);
+  refreshed.querySelectorAll('details').forEach((section, index) => { section.open = openSections[index] || false; });
+  bindCard(refreshed);
+  applyRoleRestrictions();
+  applyProductSearch();
+  refreshed.querySelector('[data-message]').textContent = 'Cambios guardados correctamente.';
+  window.scrollTo({ top: scrollBefore, behavior: 'instant' });
 }
 
 async function uploadModelCover(modelCode, file) {
@@ -713,6 +740,11 @@ async function removePhotos(card, urls) {
   urls.forEach(url => card.querySelectorAll('.photo-list figure').forEach(figure => {
     if (figure.dataset.photoUrl === url) figure.remove();
   }));
+  const gallery = card.querySelector('.photo-list');
+  if (!remaining.length && gallery && !gallery.querySelector('.gallery-empty')) gallery.innerHTML = '<div class="gallery-empty"><img src="../assets/logo.png" alt="Logo Importadora A y N"><p>Este producto aún no tiene fotografías.</p></div>';
+  card.querySelector('[data-delete-all-photos]').hidden = !remaining.length;
+  const photoCount = card.querySelector('.photos-section')?.closest('details')?.querySelector('summary small');
+  if (photoCount) photoCount.textContent = `${remaining.length} imagen(es)`;
   card.dataset.firstImage = remaining[0] || '';
   card.querySelector('.admin-thumb').src = remaining[0] || nextCover || '../assets/logo.png';
   card.querySelector('input[name="imagen_portada_actual"]').value = nextCover || '';

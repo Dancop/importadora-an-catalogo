@@ -460,7 +460,8 @@ function editor(p, i) {
                 <input name="imagen_portada_actual" type="hidden" value="${attr(coverImage)}">
               </div>
               <label>Agregar fotografías de esta presentación<input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
-              <div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure><a href="${url}" target="_blank"><img src="${url}" alt="Foto ${n+1}"></a><button type="button" data-remove-photo="${url}">Eliminar</button></figure>`).join('')}</div>
+              <div class="photo-gallery-toolbar"><button type="button" data-select-all-photos>Seleccionar todas</button><button type="button" data-delete-selected-photos>Eliminar seleccionadas</button><small>Usa las flechas para ordenar; guarda los cambios para conservar el orden.</small></div>
+              <div class="photo-list">${(p.imagenes || []).map((url, n) => `<figure data-photo-url="${attr(url)}"><label><input type="checkbox" data-select-photo> Seleccionar</label><a href="${attr(url)}" target="_blank" rel="noopener"><img src="${attr(url)}" alt="Foto ${n+1}"></a><div class="photo-actions"><button type="button" data-move-photo="-1" aria-label="Mover foto hacia atrás">←</button><button type="button" data-move-photo="1" aria-label="Mover foto hacia adelante">→</button><button type="button" data-set-cover-photo>Portada</button><button type="button" data-remove-photo="${attr(url)}">Eliminar</button></div></figure>`).join('')}</div>
             </section>
           </details>
         </div>
@@ -582,7 +583,34 @@ function bindCard(card) {
   form.querySelector('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(descriptionText(form, card.dataset.sku)));
   form.querySelector('[data-share]').addEventListener('click', () => share(descriptionText(form, card.dataset.sku), card.dataset.firstImage, form.nombre.value));
   card.querySelector('[data-toggle-cost]').addEventListener('click', event => toggleCardCost(card, event.currentTarget));
-  form.querySelectorAll('[data-remove-photo]').forEach(b => b.addEventListener('click', () => removePhoto(card.dataset.sku, b.dataset.removePhoto)));
+  const gallery = form.querySelector('.photo-list');
+  gallery?.addEventListener('click', async event => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    const figure = button.closest('figure');
+    if (button.hasAttribute('data-move-photo')) {
+      const sibling = button.dataset.movePhoto === '-1' ? figure.previousElementSibling : figure.nextElementSibling;
+      if (sibling) gallery.insertBefore(button.dataset.movePhoto === '-1' ? figure : sibling, button.dataset.movePhoto === '-1' ? sibling : figure);
+    }
+    if (button.hasAttribute('data-set-cover-photo')) {
+      form.imagen_portada_actual.value = figure.dataset.photoUrl;
+      const preview = form.querySelector('[data-cover-preview]');
+      if (preview) preview.src = figure.dataset.photoUrl;
+      if (form.cover_photo) form.cover_photo.value = '';
+      form.querySelectorAll('input[name="existing_cover"]').forEach(input => { input.checked = input.value === figure.dataset.photoUrl; });
+      form.querySelectorAll('.existing-cover-option').forEach(option => option.classList.toggle('selected', !!option.querySelector('input:checked')));
+    }
+    if (button.hasAttribute('data-remove-photo')) await removePhotos(card, [figure.dataset.photoUrl]);
+  });
+  form.querySelector('[data-select-all-photos]')?.addEventListener('click', () => {
+    const checks = [...gallery.querySelectorAll('[data-select-photo]')];
+    const next = checks.some(input => !input.checked);
+    checks.forEach(input => { input.checked = next; });
+  });
+  form.querySelector('[data-delete-selected-photos]')?.addEventListener('click', async () => {
+    const urls = [...gallery.querySelectorAll('figure')].filter(figure => figure.querySelector('[data-select-photo]')?.checked).map(figure => figure.dataset.photoUrl);
+    if (urls.length) await removePhotos(card, urls);
+  });
 }
 
 function toggleCardCost(card, button) {
@@ -686,13 +714,40 @@ document.querySelector('#catalog-settings-form').addEventListener('submit', asyn
   } catch (error) { message.textContent = `No se guardó: ${error.message}`; }
 });
 
-async function removePhoto(sku, url) {
-  if (!confirm('¿Eliminar esta fotografía?')) return;
-  const { data } = await db.from('productos_publicos').select('imagenes').eq('sku', sku).single();
-  const path = decodeURIComponent(new URL(url).pathname.split('/productos/')[1]);
-  const { error } = await db.storage.from('productos').remove([path]);
-  if (!error) await db.from('productos_publicos').update({ imagenes: (data.imagenes || []).filter(x => x !== url) }).eq('sku', sku);
-  loadProducts();
+async function removePhotos(card, urls) {
+  const sku = card.dataset.sku;
+  const message = card.querySelector('[data-message]');
+  if (!urls.length || !confirm(`¿Eliminar ${urls.length} fotografía(s)?`)) return;
+  const { data, error: readError } = await db.from('productos_publicos').select('imagenes,imagen_portada').eq('sku', sku).single();
+  if (readError) { message.textContent = readError.message; return; }
+  const remaining = (data.imagenes || []).filter(url => !urls.includes(url));
+  const coverRemoved = urls.includes(data.imagen_portada);
+  const nextCover = coverRemoved ? (remaining[0] || null) : data.imagen_portada;
+  const { error: updateError } = await db.from('productos_publicos').update({ imagenes: remaining, imagen_portada: nextCover }).eq('sku', sku);
+  if (updateError) { message.textContent = updateError.message; return; }
+  urls.forEach(url => card.querySelectorAll('.photo-list figure').forEach(figure => {
+    if (figure.dataset.photoUrl === url) figure.remove();
+  }));
+  card.dataset.firstImage = remaining[0] || '';
+  card.querySelector('.admin-thumb').src = remaining[0] || nextCover || '../assets/logo.png';
+  card.querySelector('input[name="imagen_portada_actual"]').value = nextCover || '';
+  const coverPreview = card.querySelector('[data-cover-preview]');
+  if (coverPreview) coverPreview.src = nextCover || '../assets/logo.png';
+  const { data: references, error: referenceError } = await db.from('productos_publicos').select('imagenes,imagen_portada');
+  if (referenceError) { message.textContent = 'Fotos retiradas del producto. No se pudo comprobar su eliminación física.'; return; }
+  const referenced = new Set(references.flatMap(item => [...(item.imagenes || []), item.imagen_portada].filter(Boolean)));
+  const paths = urls.filter(url => !referenced.has(url)).map(url => {
+    try {
+      const parsed = new URL(url);
+      const marker = '/storage/v1/object/public/productos/';
+      return parsed.pathname.includes(marker) ? decodeURIComponent(parsed.pathname.split(marker)[1]) : null;
+    } catch { return null; }
+  }).filter(Boolean);
+  if (paths.length) {
+    const { error: storageError } = await db.storage.from('productos').remove(paths);
+    if (storageError) { message.textContent = 'Fotos retiradas del producto; Storage requiere revisión: ' + storageError.message; return; }
+  }
+  message.textContent = 'Fotografías eliminadas. La galería permanece abierta.';
 }
 
 function descriptionText(form, sku) {

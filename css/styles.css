@@ -991,3 +991,16 @@ body.product-modal-open { overflow:hidden; }
 .admin-card .upload-progress:not([hidden]){display:grid;gap:9px;padding:14px;margin:12px 0;border:1px solid #d2e0e9;border-radius:10px;background:#f0f5f8;color:#0e3048}
 .admin-card .upload-progress progress{width:100%;height:18px;accent-color:#0e3048}
 @media(max-width:600px){.admin-card .upload-progress:not([hidden]){position:sticky;bottom:76px;z-index:15;box-shadow:0 4px 16px #071d2d25}.photos-section .selected-files-info:not([hidden]){font-size:14px}}
+
+
+/* Product editor: allow grid children and color controls to shrink inside the accordion. */
+.admin-card form,.admin-card .admin-secondary-grid,.admin-card .form-accordion,
+.admin-card .admin-form-section,.admin-card .field-grid,.admin-card .color-editor,
+.admin-card label,.admin-card input,.admin-card textarea { min-width:0; max-width:100%; }
+.admin-card .field-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.admin-card .color-picker-row { grid-template-columns:64px minmax(0,1fr); min-width:0; }
+.admin-card .eyedropper-button { grid-column:1/-1; white-space:normal; }
+.admin-card .identity-section small { overflow-wrap:anywhere; }
+@media(max-width:760px) {
+  .admin-card .identity-section .field-grid { grid-template-columns:minmax(0,1fr); }
+}

@@ -52,6 +52,7 @@ function groupProducts(rows) {
     // Si alguna presentación define un nombre de modelo explícito, ese nombre
     // gana sobre el de la presentación más antigua (comportamiento anterior).
     if (!group.nombre_modelo && row.nombre_modelo) { group.nombre_modelo = row.nombre_modelo; group.nombre = row.nombre_modelo; }
+    if (!group.contenido_set && row.contenido_set) group.contenido_set = row.contenido_set;
     group.variants.push(row);
   });
   return [...map.values()];
@@ -106,8 +107,7 @@ function card(product) {
   const price = prices.length ? `${differentPrices ? 'Desde ' : ''}${money(Math.min(...prices))}` : 'Consultar precio';
   const countBadge = product.variants.length > 1 ? `<span class="variant-count">${product.variants.length} presentaciones</span>` : '';
   const action = product.variants.length > 1 ? 'Ver opciones →' : 'Ver detalles →';
-  const pieces = [...new Set(product.variants.map(v => Number(v.piezas)).filter(v => v > 0))];
-  const summary = pieces.length === 1 ? `Incluye ${pieces[0]} artículos` : '';
+  const summary = String(product.contenido_set || '').trim();
   const bottom = `<div class="card-bottom${showPrices ? '' : ' price-hidden'}">${showPrices ? `<strong>${escapeHtml(price)}</strong>` : ''}<button class="text-button" type="button" aria-label="${escapeHtml(action.replace(' →', ''))}: ${escapeHtml(productDisplayName(product))}">${action}</button></div>`;
   return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}"><div class="product-image">${cover(product)}${countBadge}</div><div class="product-info"><h3>${escapeHtml(displayName)}</h3>${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : ''}${bottom}</div></article>`;
 }

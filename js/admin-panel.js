@@ -428,6 +428,7 @@ function editor(p, i) {
               <div class="admin-section-heading"><div><div><h3 id="identity-${attr(p.sku)}">Información del producto</h3><p>Abre esta sección solo cuando necesites cambiar los datos visibles.</p></div></div></div>
               <label>Nombre del producto<input name="nombre" value="${attr(p.nombre)}" required></label>
               <label>Nombre del modelo (aparece en la portada del catálogo)<input name="nombre_modelo" value="${attr(p.nombre_modelo || '')}" placeholder="${attr(p.nombre || '')}"><small>Se comparte entre todas las presentaciones con el mismo código de modelo. Si lo dejas vacío, se usa el nombre de la presentación más antigua (comportamiento anterior).</small></label>
+              <label>Contenido del set — visible en la portada<textarea name="contenido_set" rows="3" placeholder="Ej.: Reloj · Billetera · Bolígrafo">${attr(p.contenido_set || '')}</textarea><small>Escribe únicamente los artículos incluidos. Se comparte con las presentaciones del mismo modelo. Déjalo vacío para ocultarlo en la portada.</small></label>
               <div class="field-grid">
                 <label>SKU<input name="sku" class="sku-input locked-input" value="${attr(p.sku)}" readonly aria-readonly="true"><small>Identificador protegido; no se modifica.</small></label>
                 <label>Código de modelo<input name="codigo_modelo" value="${attr(p.codigo_modelo || '')}" required></label>
@@ -700,7 +701,8 @@ async function save(event, sku) {
   catch (e) { message.textContent = e.message; saveButton.disabled = false; progressBox.hidden = true; return; }
   const retailPrice = nullableNumber(form.precio_minorista.value);
   const modelName = form.nombre_modelo.value.trim() || null;
-  const publicData = { nombre: form.nombre.value.trim(), nombre_modelo: modelName, codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: sanitizeRichHtml(form.descripcion.value), detalle_distintivo: sanitizeRichHtml(form.detalle_distintivo.value), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
+  const setContents = form.contenido_set.value.trim() || null;
+  const publicData = { nombre: form.nombre.value.trim(), nombre_modelo: modelName, contenido_set: setContents, codigo_modelo: form.codigo_modelo.value.trim(), color_caja:form.color_caja.value.trim(), color_interior:form.color_interior.value.trim() || null, color_exterior_hex: normalizeAdminHex(form.color_exterior_hex.value) || null, color_interior_hex: normalizeAdminHex(form.color_interior_hex.value) || null, descripcion: sanitizeRichHtml(form.descripcion.value), detalle_distintivo: sanitizeRichHtml(form.detalle_distintivo.value), precio_minorista: retailPrice, imagenes: images, imagen_portada: coverUrl, actualizado_en:new Date().toISOString() };
   const privateData = { stock: Number(form.stock.value), precio_base: nullableNumber(form.precio_base.value), factor_costo: nullableNumber(form.factor_costo.value), factor_adquisicion: nullableNumber(form.factor_adquisicion.value), costo_propio: nullableNumber(form.costo_propio.value), multiplicador_mayorista: nullableNumber(form.multiplicador_mayorista.value), multiplicador_minorista: nullableNumber(form.multiplicador_minorista.value), actualizado_en:new Date().toISOString() };
   const modelCode = form.codigo_modelo.value.trim();
   const updates = [
@@ -709,6 +711,7 @@ async function save(event, sku) {
   ];
   if (modelCode && coverUrl) updates.push(db.from('productos_publicos').update({ imagen_portada: coverUrl, actualizado_en:new Date().toISOString() }).eq('codigo_modelo', modelCode));
   if (modelCode && modelName) updates.push(db.from('productos_publicos').update({ nombre_modelo: modelName, actualizado_en:new Date().toISOString() }).eq('codigo_modelo', modelCode));
+  if (modelCode) updates.push(db.from('productos_publicos').update({ contenido_set: setContents, actualizado_en:new Date().toISOString() }).eq('codigo_modelo', modelCode));
   const results = await Promise.all(updates);
   const failed = results.find(result => result.error)?.error;
   if (failed) { message.textContent = `No se guardó: ${failed.message}`; saveButton.disabled = false; progressBox.hidden = true; return; }
@@ -726,7 +729,10 @@ async function save(event, sku) {
     progressBox.hidden = true;
     return;
   }
-  publicProducts = publicProducts.map(product => product.sku === sku ? savedPublic : product);
+  publicProducts = publicProducts.map(product => product.sku === sku ? savedPublic : (modelCode && product.codigo_modelo === modelCode ? { ...product, contenido_set: setContents } : product));
+  if (modelCode) document.querySelectorAll('.admin-card form').forEach(otherForm => {
+    if (otherForm !== form && otherForm.codigo_modelo?.value.trim() === modelCode && otherForm.contenido_set) otherForm.contenido_set.value = setContents || '';
+  });
   const wrapper = document.createElement('div');
   wrapper.innerHTML = editor(savedPublic, savedPrivate);
   const refreshed = wrapper.firstElementChild;

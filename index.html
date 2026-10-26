@@ -3,64 +3,87 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Catálogo de sets de regalo de Importadora A&N en Santa Cruz de la Sierra.">
+  <meta name="description" content="Sets y detalles para regalar de Importadora A&N. Santa Cruz de la Sierra y envíos a Bolivia, previa coordinación.">
   <title>Importadora A&N | Catálogo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./css/styles.css?v=20260916-1">
+  <link rel="stylesheet" href="./css/catalog-home.css?v=20261026-1">
 </head>
-<body>
+<body class="catalog-home">
+  <a class="skip-link" href="#catalogo">Ir al catálogo</a>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="Inicio Importadora A&N">
-      <img data-brand-logo src="./assets/logo.png" alt="Importadora A&N">
-      <span data-brand-name>Importadora A&amp;N</span>
-    </a>
-    <a class="whatsapp small" data-whatsapp-general target="_blank" rel="noopener">WhatsApp</a>
+    <div class="header-main">
+      <a class="brand" href="./" aria-label="Inicio Importadora A&N">
+        <img data-brand-logo src="./assets/logo.png" alt="" width="48" height="48">
+        <span data-brand-name>Importadora A&amp;N</span>
+      </a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menú <span aria-hidden="true">☰</span></button>
+      <nav id="site-nav" class="site-nav" aria-label="Navegación principal">
+        <a href="#catalogo">Catálogo</a>
+        <a href="#entregas">Entregas</a>
+        <a href="#contacto">Contacto</a>
+        <a class="whatsapp small" data-whatsapp-general target="_blank" rel="noopener">WhatsApp</a>
+      </nav>
+    </div>
+    <p class="location-strip">Santa Cruz de la Sierra <span aria-hidden="true">·</span> Envíos a Bolivia</p>
   </header>
-
   <main>
-    <section class="hero">
-      <div>
-        <p class="eyebrow">Detalles para regalar</p>
-        <h1>Sets elegantes para cada ocasión</h1>
-        <p>Explora nuestras opciones para mujer y hombre. Consulta disponibilidad y coordina tu entrega directamente por WhatsApp.</p>
-        <a class="button primary" href="#catalogo">Ver catálogo</a>
+    <section class="gift-intro" aria-labelledby="intro-title">
+      <h1 id="intro-title">¿Para quién buscas un regalo?</h1>
+      <div class="gift-categories">
+        <a class="gift-category" href="#catalogo" data-category-link="Mujer">
+          <div class="category-photo" data-category-photo="Mujer"><span>Sets para ella</span></div>
+          <span class="category-label">Para ella <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="gift-category" href="#catalogo" data-category-link="Hombre">
+          <div class="category-photo" data-category-photo="Hombre"><span>Sets para él</span></div>
+          <span class="category-label">Para él <span aria-hidden="true">→</span></span>
+        </a>
       </div>
-      <div class="hero-mark"><img data-brand-logo src="./assets/logo.png" alt=""></div>
     </section>
-
-    <section class="benefits" aria-label="Información de compra">
-      <p><strong>Entrega en Santa Cruz</strong><span>Dentro de la ciudad, previa coordinación.</span></p>
-      <p><strong>Envíos a Bolivia</strong><span>Disponibles, previa coordinación.</span></p>
-      <p><strong>Atención personal</strong><span>Consultas y pedidos por WhatsApp.</span></p>
-    </section>
-
-    <section class="catalog" id="catalogo">
+    <section class="catalog" id="catalogo" aria-labelledby="catalog-title">
       <div class="section-heading">
-        <div><p class="eyebrow">Catálogo</p><h2>Encuentra el regalo ideal</h2></div>
+        <h2 id="catalog-title" tabindex="-1">Nuestros sets</h2>
         <div class="filters" role="group" aria-label="Filtrar catálogo">
-          <button class="filter active" data-filter="Todos">Todos</button>
-          <button class="filter" data-filter="Mujer">Mujer</button>
-          <button class="filter" data-filter="Hombre">Hombre</button>
+          <button class="filter active" data-filter="Todos" aria-pressed="true">Todos</button>
+          <button class="filter" data-filter="Mujer" aria-pressed="false">Para ella</button>
+          <button class="filter" data-filter="Hombre" aria-pressed="false">Para él</button>
         </div>
       </div>
-      <div id="status" class="status">Cargando productos…</div>
+      <p class="catalog-result" id="catalog-result" role="status" aria-live="polite"></p>
+      <div id="status" class="status" role="status">Cargando productos…</div>
       <div id="products" class="product-grid"></div>
     </section>
   </main>
-
-  <footer>
-    <img data-brand-logo src="./assets/logo.png" alt="Importadora A&N">
-    <div><strong data-brand-name>Importadora A&amp;N</strong><p>Santa Cruz de la Sierra, Bolivia</p></div>
-    <a class="whatsapp" data-whatsapp-general target="_blank" rel="noopener">Consultar por WhatsApp</a>
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-identity">
+        <a class="brand" href="./"><img data-brand-logo src="./assets/logo.png" alt="" width="48" height="48"><span data-brand-name>Importadora A&amp;N</span></a>
+        <p>Sets y detalles para regalar.</p>
+        <p>Santa Cruz de la Sierra, Bolivia.</p>
+      </div>
+      <nav class="footer-links" aria-label="Catálogo en el pie de página">
+        <h2>Explora</h2>
+        <a href="#catalogo" data-category-link="Todos">Todos los sets</a>
+        <a href="#catalogo" data-category-link="Mujer">Para ella</a>
+        <a href="#catalogo" data-category-link="Hombre">Para él</a>
+      </nav>
+      <section class="footer-contact" id="entregas" aria-labelledby="delivery-title">
+        <h2 id="delivery-title">Entregas y consultas</h2>
+        <p>Entregas en Santa Cruz y envíos a Bolivia, previa coordinación.</p>
+        <a class="whatsapp" id="contacto" data-whatsapp-general target="_blank" rel="noopener">Consultar por WhatsApp</a>
+      </section>
+    </div>
+    <div class="footer-bottom"><span data-brand-name>Importadora A&amp;N</span><a href="#intro-title">Volver arriba ↑</a></div>
   </footer>
-
   <dialog id="product-dialog" class="product-dialog">
     <button class="dialog-close" aria-label="Cerrar">×</button>
     <div id="dialog-content"></div>
   </dialog>
-
-  <script type="module" src="./js/catalog.js?v=20260916-1"></script>
+  <script src="./js/home-navigation.js?v=20261026-1" defer></script>
+  <script type="module" src="./js/catalog.js?v=20261026-1"></script>
 </body>
 </html>
+

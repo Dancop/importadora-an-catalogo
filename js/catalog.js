@@ -94,21 +94,61 @@ function cover(product) {
   return image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(productDisplayName(product))}" loading="lazy">` : `<div class="image-placeholder"><img src="${escapeHtml(brandLogo)}" alt=""><span>Fotografía próximamente</span></div>`;
 }
 
-function card(product) {
-  const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null);
-  const displayName = productDisplayName(product);
-  const countBadge = product.variants.length > 1 ? `<span class="variant-count">${product.variants.length} presentaciones</span>` : '';
-  const action = product.variants.length > 1 ? 'Elegir presentación →' : 'Ver detalles →';
-  const bottom = showPrices
-    ? `<div class="card-bottom"><strong>${prices.length ? money(Math.min(...prices)) : 'Consultar precio'}</strong><button class="text-button" type="button">${action}</button></div>`
-    : `<div class="card-bottom price-hidden"><button class="text-button catalog-cta" type="button">${action}</button></div>`;
-  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}"><div class="product-image">${cover(product)}${countBadge}</div><div class="product-info"><p class="category">${escapeHtml(product.categoria)}</p><h3>${escapeHtml(displayName)}</h3><div class="summary rich-summary">${sanitizeRichHtml(product.descripcion)}</div>${bottom}</div></article>`;
+function cardTitle(product) {
+  return productDisplayName(product).split(/\s+[-–—]\s+/)[0]
+    .replace(/\s+para\s+(?:caballero|hombre|mujer|dama)\s*$/i, '').trim();
 }
 
-function render(filter = 'Todos') {
+function card(product) {
+  const prices = product.variants.map(v => v.precio_minorista).filter(v => v != null).map(Number).filter(Number.isFinite);
+  const displayName = cardTitle(product);
+  const differentPrices = new Set(prices).size > 1;
+  const price = prices.length ? `${differentPrices ? 'Desde ' : ''}${money(Math.min(...prices))}` : 'Consultar precio';
+  const countBadge = product.variants.length > 1 ? `<span class="variant-count">${product.variants.length} presentaciones</span>` : '';
+  const action = product.variants.length > 1 ? 'Ver opciones →' : 'Ver detalles →';
+  const pieces = [...new Set(product.variants.map(v => Number(v.piezas)).filter(v => v > 0))];
+  const summary = pieces.length === 1 ? `Incluye ${pieces[0]} artículos` : '';
+  const bottom = `<div class="card-bottom${showPrices ? '' : ' price-hidden'}">${showPrices ? `<strong>${escapeHtml(price)}</strong>` : ''}<button class="text-button" type="button" aria-label="${escapeHtml(action.replace(' →', ''))}: ${escapeHtml(productDisplayName(product))}">${action}</button></div>`;
+  return `<article class="product-card" data-code="${escapeHtml(product.codigo_modelo)}"><div class="product-image">${cover(product)}${countBadge}</div><div class="product-info"><h3>${escapeHtml(displayName)}</h3>${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : ''}${bottom}</div></article>`;
+}
+
+let currentFilter = 'Todos';
+function render(filter = currentFilter) {
+  currentFilter = filter;
   const visible = filter === 'Todos' ? groups : groups.filter(p => p.categoria === filter);
   grid.innerHTML = visible.map(card).join('');
-  grid.querySelectorAll('.product-card').forEach(el => el.addEventListener('click', () => openProduct(el.dataset.code)));
+  grid.querySelectorAll('.text-button').forEach(button => button.addEventListener('click', () => openProduct(button.closest('[data-code]').dataset.code)));
+  const result = document.querySelector('#catalog-result');
+  if (result) result.textContent = visible.length ? `${visible.length} ${visible.length === 1 ? 'set' : 'sets'}${filter === 'Mujer' ? ' para ella' : filter === 'Hombre' ? ' para él' : ''}` : 'No hay sets disponibles en esta categoría por el momento.';
+}
+
+function selectCategory(filter, moveToCatalog = false) {
+  document.querySelectorAll('.filter').forEach(button => {
+    const active = button.dataset.filter === filter;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  render(filter);
+  if (moveToCatalog) document.querySelector('#catalog-title')?.focus({ preventScroll: true });
+}
+
+function renderCategoryPhotos() {
+  document.querySelectorAll('[data-category-photo]').forEach(container => {
+    const category = container.dataset.categoryPhoto;
+    const candidates = groups.filter(product => product.categoria === category && productCover(product));
+    // Prefer the sets used in the approved sketch, then fall back to the existing catalog order.
+    const preferred = category === 'Mujer' ? /coraz[oó]n/i : /tomi/i;
+    const product = candidates.find(item => preferred.test(productDisplayName(item))) || candidates[0];
+    if (!product) return;
+    const img = document.createElement('img');
+    img.src = productCover(product);
+    img.alt = productDisplayName(product);
+    img.decoding = 'async';
+    img.addEventListener('error', () => {
+      container.replaceChildren(Object.assign(document.createElement('span'), { textContent: category === 'Mujer' ? 'Sets para ella' : 'Sets para él' }));
+    }, { once: true });
+    container.replaceChildren(img);
+  });
 }
 
 
@@ -412,7 +452,8 @@ dialog.addEventListener('close', () => {
   document.body.classList.remove('product-modal-open');
   clearPresentationUrl();
 });
-document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('.filter').forEach(b => b.classList.remove('active')); button.classList.add('active'); render(button.dataset.filter); }));
+document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => selectCategory(button.dataset.filter)));
+document.querySelectorAll('[data-category-link]').forEach(link => link.addEventListener('click', () => selectCategory(link.dataset.categoryLink, true)));
 
 async function load() {
   status.hidden = false; status.textContent = 'Cargando productos…';
@@ -461,6 +502,7 @@ async function load() {
       });
     }
 
+    renderCategoryPhotos();
     render(); status.hidden = true;
     const params = new URLSearchParams(location.search);
     const deepLinkCode = params.get('producto');
@@ -480,4 +522,5 @@ async function load() {
     status.hidden = false; status.textContent = 'No pudimos cargar el catálogo. Actualiza la página para intentarlo nuevamente.';
   }
 }
+applyBrand();
 load();
